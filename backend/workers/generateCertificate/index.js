@@ -51,7 +51,7 @@ export default {
       const timestamp = Date.now();
       const cleanCourseTag = (courseId || "COURSE").replace(/[^a-zA-Z0-9]/g, "").substring(0, 6).toUpperCase();
       const verificationId = `EDUS-${timestamp.toString().slice(-6)}-${cleanCourseTag}`;
-      const verifyUrl = `https://verify.edusphere-app.workers.dev/verify/${verificationId}`;
+      const verifyUrl = `https://verify-certificate.edusphere-app.workers.dev/verify/${verificationId}`;
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`;
 
       const cloudName = env.CLOUDINARY_CLOUD_NAME || "kl8rl0al";

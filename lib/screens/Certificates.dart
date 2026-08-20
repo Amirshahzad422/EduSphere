@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../models/certificate_model.dart';
 import '../services/certificate_service.dart';
+import '../services/certificate_pdf_generator.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
@@ -14,7 +16,12 @@ import '../utils/formatters.dart';
 import '../utils/helpers.dart';
 
 class CertificatesScreen extends ConsumerStatefulWidget {
-  const CertificatesScreen({super.key});
+  final String? initialVerificationId;
+
+  const CertificatesScreen({
+    super.key,
+    this.initialVerificationId,
+  });
 
   @override
   ConsumerState<CertificatesScreen> createState() => _CertificatesScreenState();
@@ -23,6 +30,17 @@ class CertificatesScreen extends ConsumerStatefulWidget {
 class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
   final TextEditingController _verifyController = TextEditingController();
   bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialVerificationId?.isNotEmpty == true) {
+      _verifyController.text = widget.initialVerificationId!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleVerifyId(widget.initialVerificationId!);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -116,17 +134,15 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
           ),
-          if (isValid && certData != null && (certData['pdfUrl'] != null || certData['verificationId'] != null))
+          if (isValid && certData != null)
             AppButton(
-              label: 'Copy Public URL',
+              label: 'Download PDF',
               variant: ButtonVariant.primary,
               size: ButtonSize.sm,
-              onPressed: () {
-                final verId = certData['verificationId'] ?? '';
-                final url = 'https://verify.edusphere-app.workers.dev/verify/$verId';
-                Clipboard.setData(ClipboardData(text: url));
+              onPressed: () async {
                 Navigator.pop(ctx);
-                AppHelpers.showSnackBar(context, 'Public verification URL copied!');
+                final cert = CertificateModel.fromJson(certData);
+                await _handleDownloadPdf(cert);
               },
             ),
         ],
@@ -161,133 +177,371 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
     );
   }
 
+  Future<void> _handleDownloadPdf(CertificateModel cert) async {
+    try {
+      await CertificatePdfGenerator.downloadOrPrintPdf(cert);
+      if (mounted) {
+        AppHelpers.showSnackBar(context, '✅ Generating & downloading official PDF for ${cert.userName}');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppHelpers.showSnackBar(context, 'PDF download exception: $e', isError: true);
+      }
+    }
+  }
+
   void _showCertificateDetailModal(CertificateModel cert) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedXl),
+        backgroundColor: Colors.transparent,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 600),
-          padding: const EdgeInsets.all(24),
+          constraints: const BoxConstraints(maxWidth: 760),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF030D1E), Color(0xFF002244), Color(0xFF00407A), Color(0xFF030D1E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 10)),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Top close action row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.workspace_premium, color: AppColors.secondary, size: 28),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Verified Credential',
-                          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2010B981),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF10B981)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, size: 14, color: Color(0xFF10B981)),
+                          SizedBox(width: 6),
+                          Text(
+                            'OFFICIALLY VERIFIED CREDENTIAL',
+                            style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, color: Colors.white70),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
+
+                // Main Certificate Parchment
                 Container(
-                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: AppSpacing.roundedLg,
-                    border: Border.all(color: AppColors.secondaryFixedDim.withOpacity(0.4)),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 10),
+                    ],
                   ),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        'CERTIFICATE OF COMPLETION',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondaryFixed,
-                          letterSpacing: 1.5,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      // Top Medal + Script Header
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 18,
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Color(0xFF0F172A), Color(0xFFD4AF37), Color(0xFF0F172A)],
+                                    ),
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+                                  ),
+                                ),
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const RadialGradient(
+                                      center: Alignment(-0.3, -0.3),
+                                      colors: [Color(0xFFFFF5C0), Color(0xFFD4AF37), Color(0xFF8C6200)],
+                                    ),
+                                    border: Border.all(color: const Color(0xFFFDF6C7), width: 2.5),
+                                    boxShadow: const [
+                                      BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.star, size: 22, color: Color(0xFF5A3C00)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Certificate',
+                                style: GoogleFonts.greatVibes(
+                                  fontSize: 48,
+                                  color: const Color(0xFF0A2540),
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.0,
+                                ),
+                              ),
+                              Text(
+                                'OF COMPLETION & APPRECIATION',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  letterSpacing: 4.0,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
+
                       Text(
-                        'This is proudly presented to',
-                        style: AppTypography.bodySmall.copyWith(color: Colors.white70),
+                        'This Certificate is Honorably Bestowed Upon',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          color: const Color(0xFF64748B),
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                       const SizedBox(height: 6),
+
+                      // Student Name
                       Text(
                         cert.userName,
-                        style: AppTypography.headlineSmall.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.greatVibes(
+                          fontSize: 42,
+                          color: const Color(0xFF0A192F),
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
+
+                      // Gold Divider
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 1.5,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.transparent, Color(0xFFD4AF37)],
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text(
+                              '✦ ❖ ✦',
+                              style: TextStyle(color: Color(0xFFD4AF37), fontSize: 11),
+                            ),
+                          ),
+                          Container(
+                            width: 80,
+                            height: 1.5,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFFD4AF37), Colors.transparent],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Commendation
                       Text(
-                        'for masterclass graduation in',
-                        style: AppTypography.bodySmall.copyWith(color: Colors.white70),
+                        'In recognition of your outstanding dedication, integrity, and meaningful contributions throughout the masterclass curriculum of',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12.5, color: const Color(0xFF475569), height: 1.4),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         cert.courseTitle,
                         textAlign: TextAlign.center,
-                        style: AppTypography.titleMedium.copyWith(
-                          color: AppColors.secondaryFixedDim,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0A192F),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(
+                        CertificatePdfGenerator.formatPresentedDate(cert.issuedAt),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        color: Colors.white,
-                        child: Image.network(
-                          cert.qrCodeUrl,
-                          width: 110,
-                          height: 110,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, size: 80),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SelectableText(
-                        'Verification ID: ${cert.verificationId}',
-                        style: AppTypography.labelSmall.copyWith(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      const SizedBox(height: 24),
+
+                      // Bottom Signatures + High-Res Scannable QR Code
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // Left Signature (Instructor)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 130,
+                                height: 2,
+                                color: const Color(0xFFD4AF37),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                cert.instructorName,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0A192F),
+                                ),
+                              ),
+                              Text(
+                                'Lead Faculty & Course Director',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.5,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Center Signature (Organizational Excellence)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 130,
+                                height: 2,
+                                color: const Color(0xFFD4AF37),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Donna Stroupe',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0A192F),
+                                ),
+                              ),
+                              Text(
+                                'Head of Organizational Excellence',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.5,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Right QR Code
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
+                                  ],
+                                ),
+                                child: Image.network(
+                                  cert.qrCodeUrl,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: const Color(0xFFF1F5F9),
+                                    child: const Icon(Icons.qr_code_2, size: 50, color: Color(0xFF64748B)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              SelectableText(
+                                cert.verificationId,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
+
+                // Modal Actions
                 Row(
                   children: [
                     Expanded(
                       child: AppButton(
-                        label: 'Download PDF',
-                        icon: Icons.download,
+                        label: 'Download / Print PDF',
+                        icon: Icons.print,
                         variant: ButtonVariant.primary,
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          AppHelpers.showSnackBar(
-                            context,
-                            '✅ Certificate downloaded: ${cert.verificationId}.pdf',
-                          );
-                        },
+                        onPressed: () => _handleDownloadPdf(cert),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.link, size: 18),
-                        label: const Text('Copy Link'),
+                        label: const Text('Copy Verification Link'),
                         style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white38),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
                         ),
                         onPressed: () {
-                          final url = 'https://verify.edusphere-app.workers.dev/verify/${cert.verificationId}';
+                          final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
                           Clipboard.setData(ClipboardData(text: url));
                           Navigator.pop(ctx);
                           AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
@@ -319,7 +573,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
         courseTitle: 'Complete Flutter & Firebase Masterclass 2026',
         instructorName: 'Alexandre Rivera',
         verificationId: 'EDUS-849204-FLUTTER',
-        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify.edusphere-app.workers.dev/verify/EDUS-849204-FLUTTER',
+        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify-certificate.edusphere-app.workers.dev/verify/EDUS-849204-FLUTTER',
         issuedAt: DateTime.now().subtract(const Duration(days: 15)),
       ),
       CertificateModel(
@@ -330,7 +584,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
         courseTitle: 'Enterprise UI/UX Design Systems & Figma Pro',
         instructorName: 'Marcus Vance',
         verificationId: 'EDUS-731902-DESIGN',
-        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify.edusphere-app.workers.dev/verify/EDUS-731902-DESIGN',
+        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify-certificate.edusphere-app.workers.dev/verify/EDUS-731902-DESIGN',
         issuedAt: DateTime.now().subtract(const Duration(days: 45)),
       ),
     ];
@@ -556,9 +810,9 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                         borderRadius: AppSpacing.roundedLg,
                         child: CertificateCard(
                           certificate: cert,
-                          onDownload: () => _showCertificateDetailModal(cert),
+                          onDownload: () => _handleDownloadPdf(cert),
                           onShare: () {
-                            final url = 'https://verify.edusphere-app.workers.dev/verify/${cert.verificationId}';
+                            final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
                             Clipboard.setData(ClipboardData(text: url));
                             AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
                           },

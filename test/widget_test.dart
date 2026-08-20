@@ -1379,7 +1379,7 @@ class _MockCloudinaryHttpClient extends http.BaseClient {
           'courseTitle': 'Complete Flutter Masterclass',
           'instructorName': 'Dr. Sarah Chen',
           'verificationId': 'EDUS-991204-FLUTT',
-          'qrCodeUrl': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://verify.edusphere-app.workers.dev/verify/EDUS-991204-FLUTT',
+          'qrCodeUrl': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://verify-certificate.edusphere-app.workers.dev/verify/EDUS-991204-FLUTT',
           'pdfUrl': 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/certificates/EDUS-991204-FLUTT.pdf',
           'issuedAt': DateTime.now().toIso8601String(),
         },

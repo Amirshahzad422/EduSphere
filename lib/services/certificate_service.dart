@@ -33,7 +33,7 @@ class CertificateService {
     final cleanTag = courseId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
     final tagSub = cleanTag.length > 6 ? cleanTag.substring(0, 6) : cleanTag;
     final fallbackVerificationId = 'EDUS-${timestamp.toString().substring(timestamp.toString().length - 6)}-$tagSub';
-    final fallbackVerifyUrl = 'https://verify.edusphere-app.workers.dev/verify/$fallbackVerificationId';
+    final fallbackVerifyUrl = 'https://verify-certificate.edusphere-app.workers.dev/verify/$fallbackVerificationId';
     final fallbackQrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(fallbackVerifyUrl)}';
     final fallbackPdfUrl = 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/certificates/$fallbackVerificationId.pdf';
 

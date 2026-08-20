@@ -176,7 +176,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/certificates',
-            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const CertificatesScreen()),
+            pageBuilder: (context, state) {
+              final queryId = state.uri.queryParameters['verify'];
+              return _buildFadeSlidePage(key: state.pageKey, child: CertificatesScreen(initialVerificationId: queryId));
+            },
+          ),
+          GoRoute(
+            path: '/verify/:id',
+            pageBuilder: (context, state) {
+              final verId = state.pathParameters['id'];
+              return _buildFadeSlidePage(key: state.pageKey, child: CertificatesScreen(initialVerificationId: verId));
+            },
           ),
           GoRoute(
             path: '/cart',
