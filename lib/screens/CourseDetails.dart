@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../models/user_model.dart';
+import '../models/live_class_model.dart';
 import '../providers/course_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/enrolment_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/live_class_provider.dart';
 import '../models/course_model.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
@@ -99,6 +102,7 @@ class CourseDetailsScreen extends ConsumerWidget {
     final isEnrolled = ref.watch(enrolmentProvider.notifier).isEnrolled(courseId);
     final isInCart = ref.watch(cartProvider.notifier).isInCart(courseId);
     final isWishlisted = ref.watch(wishlistProvider.notifier).isInWishlist(courseId);
+    final upcomingLiveAsync = ref.watch(courseUpcomingLiveClassProvider(courseId));
 
     return coursesAsync.when(
       data: (courses) {
@@ -160,6 +164,23 @@ class CourseDetailsScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Live Class Banner (If active or upcoming)
+                            upcomingLiveAsync.maybeWhen(
+                              data: (liveClass) {
+                                if (liveClass == null || liveClass.isEnded) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 20.0),
+                                  child: _buildLiveClassBanner(
+                                    context,
+                                    liveClass,
+                                    isEnrolled: isEnrolled,
+                                    isInstructor: isOwnInstructorCourse,
+                                  ),
+                                );
+                              },
+                              orElse: () => const SizedBox.shrink(),
+                            ),
+
                             // Preview Video / Thumbnail
                             _buildHeroPreview(context, course),
                             const SizedBox(height: 24),
@@ -857,6 +878,132 @@ class CourseDetailsScreen extends ConsumerWidget {
           Icon(icon, size: 16, color: AppColors.outline),
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: AppTypography.bodySmall)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveClassBanner(
+    BuildContext context,
+    LiveClassModel liveClass, {
+    required bool isEnrolled,
+    required bool isInstructor,
+  }) {
+    final isLive = liveClass.isLive;
+    final canJoin = isEnrolled || isInstructor;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isLive ? AppColors.error.withOpacity(0.06) : AppColors.secondaryFixedDim.withOpacity(0.15),
+        borderRadius: AppSpacing.roundedLg,
+        border: Border.all(
+          color: isLive ? AppColors.error : AppColors.secondary,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isLive ? AppColors.error : AppColors.secondary,
+                  borderRadius: AppSpacing.roundedFull,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isLive ? 'LIVE NOW' : 'UPCOMING LIVE CLASS',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isLive
+                      ? 'Live interactive class is active right now!'
+                      : 'Scheduled for ${DateFormat('MMM dd • hh:mm a').format(liveClass.scheduledAt)}',
+                  style: AppTypography.bodySmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: isLive ? AppColors.error : AppColors.secondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            liveClass.title,
+            style: AppTypography.titleMedium.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+          if (liveClass.description != null && liveClass.description!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              liveClass.description!,
+              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 14),
+
+          // Join button / Enroll CTA
+          Row(
+            children: [
+              if (canJoin)
+                AppButton(
+                  label: isLive ? 'Join Live Class' : 'Live Class Scheduled',
+                  variant: isLive ? ButtonVariant.danger : ButtonVariant.secondary,
+                  size: ButtonSize.sm,
+                  icon: isLive ? Icons.videocam : Icons.event,
+                  onPressed: isLive || isInstructor
+                      ? () => context.go('/live-class/${liveClass.id}')
+                      : null,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: AppSpacing.roundedSm,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_outline, size: 16, color: AppColors.outline),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Enroll in this course to join live interactive sessions',
+                        style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

@@ -81,6 +81,18 @@ class InstructorDashboardScreen extends ConsumerWidget {
                     Row(
                       children: [
                         OutlinedButton.icon(
+                          icon: const Icon(Icons.videocam, size: 18),
+                          label: const Text('Live Classes'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.outlineVariant),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
+                          ),
+                          onPressed: () => context.go('/instructor/live-classes'),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
                           icon: const Icon(Icons.school, size: 18),
                           label: const Text('Student View'),
                           style: OutlinedButton.styleFrom(
@@ -150,6 +162,16 @@ class InstructorDashboardScreen extends ConsumerWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.videocam, size: 16),
+                          label: const Text('Live Classes'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.outlineVariant),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          onPressed: () => context.go('/instructor/live-classes'),
+                        ),
                         OutlinedButton.icon(
                           icon: const Icon(Icons.school, size: 16),
                           label: const Text('Student View'),

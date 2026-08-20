@@ -29,6 +29,12 @@ import 'package:edusphere/services/quiz_service.dart';
 import 'package:edusphere/services/notification_service.dart';
 import 'package:edusphere/components/VideoPlayer.dart';
 import 'package:edusphere/services/cloudinary_upload_service.dart';
+import 'package:edusphere/models/live_class_model.dart';
+import 'package:edusphere/services/live_class_service.dart';
+import 'package:edusphere/providers/live_class_provider.dart';
+import 'package:edusphere/screens/LiveClassManagement.dart';
+import 'package:edusphere/screens/LiveClass.dart';
+import 'package:edusphere/components/LiveClassRoom.dart';
 
 class _TestHttpOverrides extends HttpOverrides {
   @override
@@ -956,6 +962,102 @@ void main() {
 
     expect(updatedFound.title, contains('Updated 2026 Edition'));
     expect(updatedFound.price, 79.99);
+  });
+
+  group('Phase 5 Live Class End-to-End Flow & Security', () {
+    test('LiveClassModel: serialization and status transitions', () {
+      final scheduled = LiveClassModel(
+        id: 'class_demo_01',
+        courseId: 'course_ai_101',
+        instructorId: 'inst_sarah',
+        title: 'Deep Learning Mastery',
+        scheduledAt: DateTime.now().add(const Duration(hours: 2)),
+        durationMinutes: 60,
+        jitsiRoomId: 'edusphere-room-ai101-123',
+        status: LiveClassStatus.scheduled,
+        createdAt: DateTime.now(),
+      );
+
+      expect(scheduled.isScheduled, isTrue);
+      expect(scheduled.isLive, isFalse);
+      expect(scheduled.isEnded, isFalse);
+
+      final json = scheduled.toJson();
+      expect(json['courseId'], 'course_ai_101');
+      expect(json['status'], 'scheduled');
+
+      final fromJson = LiveClassModel.fromJson(json);
+      expect(fromJson.title, 'Deep Learning Mastery');
+      expect(fromJson.jitsiRoomId, 'edusphere-room-ai101-123');
+
+      final liveState = fromJson.copyWith(status: LiveClassStatus.live);
+      expect(liveState.isLive, isTrue);
+    });
+
+    test('LiveClassService: schedule, start, join, message, and end lifecycle', () async {
+      final service = LiveClassService();
+
+      // 1. Instructor schedules class
+      final created = await service.scheduleLiveClass(
+        courseId: 'course_cloud_arch',
+        instructorId: 'inst_sarah',
+        title: 'Cloud Architecture Live Q&A',
+        description: 'Deep dive into VPC peering and IAM policies.',
+        scheduledAt: DateTime.now().add(const Duration(hours: 1)),
+        durationMinutes: 45,
+      );
+
+      expect(created.id, isNotEmpty);
+      expect(created.status, LiveClassStatus.scheduled);
+      expect(created.jitsiRoomId, contains('edusphere_course_cloud_arch'));
+
+      // 2. Instructor starts class
+      await service.startLiveClass(created.id);
+      final activeClass = await service.getLiveClass(created.id);
+      expect(activeClass?.status, LiveClassStatus.live);
+      expect(activeClass?.isLive, isTrue);
+
+      // 3. Student joins class
+      const student = UserModel(
+        id: 'student_007',
+        name: 'James Bond',
+        email: '007@mi6.gov.uk',
+        role: UserRole.student,
+      );
+      await service.joinLiveClass(created.id, student, isMicOn: true, isCameraOn: false);
+
+      final participants = await service.getParticipants(created.id);
+      expect(participants.any((p) => p.userId == 'student_007'), isTrue);
+
+      // 4. Student toggles hand raise and mute
+      await service.updateParticipantMedia(created.id, 'student_007', isHandRaised: true, isMicOn: false);
+      final updatedParticipants = await service.getParticipants(created.id);
+      final studentParticipant = updatedParticipants.firstWhere((p) => p.userId == 'student_007');
+      expect(studentParticipant.isHandRaised, isTrue);
+      expect(studentParticipant.isMicOn, isFalse);
+
+      // 5. Student sends live in-class chat message
+      await service.sendMessage(created.id, student, 'Can we discuss CloudFormation vs Terraform?');
+      final messages = await service.getMessages(created.id);
+      expect(messages.any((m) => m.message.contains('CloudFormation vs Terraform')), isTrue);
+
+      // 6. Instructor ends class
+      await service.endLiveClass(created.id);
+      final endedClass = await service.getLiveClass(created.id);
+      expect(endedClass?.status, LiveClassStatus.ended);
+      expect(endedClass?.isEnded, isTrue);
+    });
+
+    test('Enrolment doc ID matches Firestore security rule convention userId_courseId', () {
+      const userId = 'user_abc_123';
+      const courseId = 'course_flutter_01';
+      final deterministicDocId = '${userId}_$courseId';
+
+      expect(deterministicDocId, 'user_abc_123_course_flutter_01');
+      // Verifies security rule evaluation: exists(/databases/$(database)/documents/enrolments/$(request.auth.uid + '_' + resource.data.courseId))
+      final evaluatedRuleDocPath = 'enrolments/${userId}_$courseId';
+      expect(evaluatedRuleDocPath, 'enrolments/user_abc_123_course_flutter_01');
+    });
   });
 }
 

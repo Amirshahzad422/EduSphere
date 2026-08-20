@@ -18,6 +18,17 @@ service cloud.firestore {
         get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
     }
 
+    function isEnrolledInCourse(courseId) {
+      return isAuthenticated() && (
+        isCourseInstructor(courseId) ||
+        exists(/databases/$(database)/documents/enrolments/$(request.auth.uid + '_' + courseId))
+      );
+    }
+
+    function getLiveClassCourseId(classId) {
+      return get(/databases/$(database)/documents/liveClasses/$(classId)).data.courseId;
+    }
+
     // =========================================================================
     // Users Collection
     // =========================================================================
@@ -86,11 +97,59 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // Live Classes Collection
+    // Live Classes Collection (STRICT ACCESS CONTROL)
     // =========================================================================
     match /liveClasses/{classId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isCourseInstructor(request.resource.data.courseId);
+      // 1. Create: Only the instructor who owns the specified courseId
+      allow create: if isAuthenticated() &&
+        request.resource.data.instructorId == request.auth.uid &&
+        isCourseInstructor(request.resource.data.courseId);
+
+      // 2. Update & Delete: Only the owning instructor who owns the course
+      allow update, delete: if isAuthenticated() &&
+        resource.data.instructorId == request.auth.uid &&
+        isCourseInstructor(resource.data.courseId);
+
+      // 3. Read: ONLY the owning instructor OR a student enrolled in courseId
+      allow read: if isAuthenticated() && (
+        (resource.data.instructorId == request.auth.uid && isCourseInstructor(resource.data.courseId)) ||
+        exists(/databases/$(database)/documents/enrolments/$(request.auth.uid + '_' + resource.data.courseId))
+      );
+
+      // -----------------------------------------------------------------------
+      // Realtime In-Class Participants Subcollection
+      // -----------------------------------------------------------------------
+      match /participants/{participantId} {
+        // Read: ONLY owning instructor OR enrolled student of this class's course
+        allow read: if isAuthenticated() && isEnrolledInCourse(getLiveClassCourseId(classId));
+
+        // Create / Update: Participant themselves AND enrolled in the course
+        allow create, update: if isAuthenticated() &&
+          request.auth.uid == participantId &&
+          isEnrolledInCourse(getLiveClassCourseId(classId));
+
+        // Delete: Participant themselves leaving OR owning instructor removing a participant
+        allow delete: if isAuthenticated() && (
+          request.auth.uid == participantId ||
+          isCourseInstructor(getLiveClassCourseId(classId))
+        );
+      }
+
+      // -----------------------------------------------------------------------
+      // Realtime In-Class Messages Subcollection
+      // -----------------------------------------------------------------------
+      match /messages/{messageId} {
+        // Read: ONLY owning instructor OR enrolled student of this class's course
+        allow read: if isAuthenticated() && isEnrolledInCourse(getLiveClassCourseId(classId));
+
+        // Create: Sender themselves AND enrolled in the course
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderId == request.auth.uid &&
+          isEnrolledInCourse(getLiveClassCourseId(classId));
+
+        // In-class messages are immutable
+        allow update, delete: if false;
+      }
     }
   }
 }

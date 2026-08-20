@@ -22,6 +22,7 @@ import '../screens/Wishlist.dart';
 import '../screens/Profile.dart';
 import '../screens/InstructorDashboard.dart';
 import '../screens/CourseBuilder.dart';
+import '../screens/LiveClassManagement.dart';
 import '../screens/Earnings.dart';
 import '../screens/About.dart';
 import '../screens/Contact.dart';
@@ -31,7 +32,7 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(de
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 /// List of routes that require instructor role
-const _instructorOnlyRoutes = ['/instructor', '/builder', '/earnings'];
+const _instructorOnlyRoutes = ['/instructor', '/builder', '/earnings', '/instructor/live-classes'];
 
 /// List of routes that require user authentication
 const _authenticatedOnlyRoutes = [
@@ -182,6 +183,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               final courseId = state.uri.queryParameters['courseId'] ?? state.extra as String?;
               return CourseBuilderScreen(courseId: courseId);
             },
+          ),
+          GoRoute(
+            path: '/instructor/live-classes',
+            builder: (context, state) => const LiveClassManagementScreen(),
           ),
           GoRoute(
             path: '/earnings',

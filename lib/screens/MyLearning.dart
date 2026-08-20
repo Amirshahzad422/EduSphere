@@ -6,6 +6,8 @@ import '../providers/course_provider.dart';
 import '../providers/cart_provider.dart';
 import '../models/course_model.dart';
 import '../models/enrolment_model.dart';
+import '../models/live_class_model.dart';
+import '../providers/live_class_provider.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
@@ -57,6 +59,12 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
     final allCoursesAsync = ref.watch(allCoursesProvider);
     final wishlist = ref.watch(wishlistProvider);
     final isDesktop = AppHelpers.isDesktop(context);
+    final allLiveClasses = ref.watch(allLiveClassesStreamProvider).value ?? [];
+
+    final activeEnrolledLiveClasses = allLiveClasses.where((lc) {
+      if (!lc.isLive) return false;
+      return ref.read(enrolmentProvider.notifier).isEnrolled(lc.courseId);
+    }).toList();
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
@@ -107,6 +115,12 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                 style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
               ),
               const SizedBox(height: 20),
+
+              // Hero Live Session Banner (if an enrolled course has a live session right now)
+              if (activeEnrolledLiveClasses.isNotEmpty) ...[
+                _buildLiveHeroBanner(context, activeEnrolledLiveClasses.first),
+                const SizedBox(height: 20),
+              ],
 
               // Stitch Navigation Tabs (In Progress, Completed, Wishlist)
               Container(
@@ -200,16 +214,23 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                     ? course.syllabus.first.lessons.first.id
                                     : '1');
 
+                            final activeLiveForCourse = allLiveClasses.where((lc) => lc.courseId == course.id && lc.isLive).toList();
+                            final hasLiveClass = activeLiveForCourse.isNotEmpty;
+                            final activeLiveClass = hasLiveClass ? activeLiveForCourse.first : null;
+
                             return Container(
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: AppSpacing.roundedLg,
-                                border: Border.all(color: AppColors.surfaceContainerHigh),
-                                boxShadow: const [
+                                border: Border.all(
+                                  color: hasLiveClass ? AppColors.error : AppColors.surfaceContainerHigh,
+                                  width: hasLiveClass ? 1.5 : 1.0,
+                                ),
+                                boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.cardShadow,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 3),
+                                    color: hasLiveClass ? AppColors.error.withOpacity(0.08) : AppColors.cardShadow,
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
@@ -223,7 +244,9 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                     right: 0,
                                     height: 4,
                                     child: Container(
-                                      color: isCompleted ? AppColors.success : AppColors.secondary,
+                                      color: hasLiveClass
+                                          ? AppColors.error
+                                          : (isCompleted ? AppColors.success : AppColors.secondary),
                                     ),
                                   ),
                                   Padding(
@@ -232,7 +255,7 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
-                                        // Header Row: Icon & Level Badge
+                                        // Header Row: Icon & Level / Live Badge
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
@@ -240,29 +263,62 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                               width: 44,
                                               height: 44,
                                               decoration: BoxDecoration(
-                                                color: AppColors.surfaceContainerLow,
+                                                color: hasLiveClass
+                                                    ? AppColors.error.withOpacity(0.1)
+                                                    : AppColors.surfaceContainerLow,
                                                 borderRadius: AppSpacing.roundedMd,
                                               ),
                                               child: Icon(
-                                                _getCategoryIcon(course.category),
-                                                color: AppColors.secondary,
+                                                hasLiveClass ? Icons.videocam : _getCategoryIcon(course.category),
+                                                color: hasLiveClass ? AppColors.error : AppColors.secondary,
                                                 size: 24,
                                               ),
                                             ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.secondary.withOpacity(0.12),
-                                                borderRadius: AppSpacing.roundedFull,
-                                              ),
-                                              child: Text(
-                                                course.level,
-                                                style: AppTypography.labelSmall.copyWith(
-                                                  color: AppColors.secondary,
-                                                  fontWeight: FontWeight.w700,
+                                            if (hasLiveClass)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.error,
+                                                  borderRadius: AppSpacing.roundedFull,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Container(
+                                                      width: 6,
+                                                      height: 6,
+                                                      decoration: const BoxDecoration(
+                                                        color: Colors.white,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'LIVE NOW',
+                                                      style: AppTypography.labelSmall.copyWith(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.w900,
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              )
+                                            else
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.secondary.withOpacity(0.12),
+                                                  borderRadius: AppSpacing.roundedFull,
+                                                ),
+                                                child: Text(
+                                                  course.level,
+                                                  style: AppTypography.labelSmall.copyWith(
+                                                    color: AppColors.secondary,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
                                           ],
                                         ),
                                         const SizedBox(height: 14),
@@ -308,19 +364,34 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                         ),
                                         const SizedBox(height: 16),
 
-                                        // Action Button
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: AppButton(
-                                            label: isCompleted ? 'Review Course' : 'Resume',
-                                            variant: isCompleted ? ButtonVariant.outline : ButtonVariant.primary,
-                                            size: ButtonSize.md,
-                                            icon: isCompleted ? Icons.workspace_premium : Icons.play_arrow,
-                                            onPressed: () {
-                                              context.go('/lesson/${course.id}/$resumeLessonId');
-                                            },
+                                        // Action Buttons
+                                        if (hasLiveClass) ...[
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: AppButton(
+                                              label: '🔴 Join Live Class',
+                                              variant: ButtonVariant.danger,
+                                              size: ButtonSize.md,
+                                              icon: Icons.videocam_rounded,
+                                              onPressed: () {
+                                                context.go('/live-class/${activeLiveClass!.id}');
+                                              },
+                                            ),
                                           ),
-                                        ),
+                                        ] else ...[
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: AppButton(
+                                              label: isCompleted ? 'Review Course' : 'Resume',
+                                              variant: isCompleted ? ButtonVariant.outline : ButtonVariant.primary,
+                                              size: ButtonSize.md,
+                                              icon: isCompleted ? Icons.workspace_premium : Icons.play_arrow,
+                                              onPressed: () {
+                                                context.go('/lesson/${course.id}/$resumeLessonId');
+                                              },
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -447,6 +518,104 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLiveHeroBanner(BuildContext context, LiveClassModel liveClass) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.06),
+        borderRadius: AppSpacing.roundedXl,
+        border: Border.all(color: AppColors.error, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.error.withOpacity(0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.videocam_rounded, color: AppColors.error, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: AppSpacing.roundedFull,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'LIVE NOW',
+                            style: AppTypography.labelSmall.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Live class in session for your enrolled curriculum!',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  liveClass.title,
+                  style: AppTypography.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          AppButton(
+            label: 'Join Live Room',
+            variant: ButtonVariant.danger,
+            size: ButtonSize.md,
+            icon: Icons.play_arrow_rounded,
+            onPressed: () => context.go('/live-class/${liveClass.id}'),
+          ),
+        ],
       ),
     );
   }

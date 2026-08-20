@@ -54,10 +54,36 @@ All notable changes to the EduSphere project will be documented in this file.
   - Persistence: Stores completed attempts in Cloud Firestore `quizAttempts/{attemptId}`.
 - **Unit & Widget Tests**: 22 comprehensive test suites covering playback position resume, Cloudflare Worker access control rejection (403), quiz auto-grading & short-answer evaluation, FCM notifications, and video player widget interactions.
 
+- **End-to-End Live Class Scheduling & Student Join Flow (`LiveClassManagement.dart`, `LiveClassRoom.dart`, `LiveClass.dart`, `LiveClassService`)**:
+  - **Instructor Live Class Management (`LiveClassManagement.dart`)**: Pixel-accurate match to `/stitch/live_class_management/code.html`.
+    - Left column schedule form: Title, owned course dropdown (with instructor ownership validation), date picker, start time picker, duration in minutes, and description.
+    - Right column session cards: Top accent line, title, course, date/time, duration, "Start Class" action button (sets status to `live`), and completed sessions archive.
+  - **Student Live Banner & Join CTA (`CourseDetails.dart`, `MyLearning.dart`)**:
+    - Real-time live status banner on CourseDetails (`🔴 LIVE NOW` vs upcoming scheduled time).
+    - Strict enrollment guard: "Join Live Class" enabled only for enrolled students or course instructor. Un-enrolled visitors are prompted to enroll.
+  - **Live Room Experience (`LiveClassRoom.dart`, `LiveClass.dart`)**:
+    - Jitsi Meet embed placeholder with pulsing LIVE badge and active timer.
+    - Real-time participant overlay streaming `liveClasses/{id}/participants` with active mic, camera, and raise-hand indicators.
+    - Real-time in-class Firestore chat drawer streaming `liveClasses/{id}/messages`.
+    - Media controls toolbar: mic mute/unmute, camera on/off, raise hand, chat toggle, and End/Leave button.
+    - Instructor "End Class for All": sets status to `ended` and gracefully displays "Class Ended" modal for all connected students with 1-tap redirect to My Learning.
+  - **Global Persistent Live Mini-Player / PiP Banner (`MainLayout.dart`, `live_class_provider.dart`)**:
+    - When a live class is in progress for any enrolled course or instructor broadcast, navigating anywhere in the app displays a floating, pulsing red `LIVE` mini-pill across all screens.
+    - 1-tap redirect returns users instantly back to `/live-class/:id` without needing to find the specific course page.
+  - **My Learning Live Integration (`MyLearning.dart`)**:
+    - Displays a prominent red **"🔴 LIVE CLASS IN PROGRESS"** Hero banner at the top of the My Learning dashboard for any active enrolled course.
+    - Highlights live course cards with red accent borders, a **"🔴 LIVE NOW"** badge, and a direct **"🔴 Join Live Class"** action button.
+  - **Hardened Firestore Security Rules (`firestore.rules`)**:
+    - `liveClasses` create/update/delete: strictly restricted to authenticated instructor who owns the target `courseId`.
+    - `liveClasses` read: strictly restricted to owning instructor OR enrolled students with matching deterministic doc `enrolments/$(request.auth.uid + '_' + resource.data.courseId)`.
+    - `participants` and `messages` subcollections: strictly guarded by `isEnrolledInCourse(getLiveClassCourseId(classId))`.
+  - **Push Notification Dispatch**: FCM push notifications triggered when classes are scheduled and when starting soon.
+
 ### Tested
 - `dart analyze lib` -> 0 issues found (Clean).
-- `flutter test` -> 22/22 test suites passed (100%).
-- Mid-video playback reload and resume position persistence verified.
+- `flutter test` -> 27/27 test suites passed (100%).
+- Live class scheduling, starting, joining, media toggling, chat messaging, and ending lifecycle verified end-to-end.
+- Deterministic enrolment ID convention `${userId}_${courseId}` validated against Firestore security rule queries.
 - Server-side 403 access control rejection for unenrolled accounts verified.
 - Short answer exclusion from auto-score & pending review flag verified.
 - FCM live class notification dispatch verified.

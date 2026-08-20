@@ -135,8 +135,9 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
     try {
       if (Firebase.apps.isNotEmpty) {
         final firestore = FirebaseFirestore.instance;
-        await firestore.collection('enrolments').doc(newEnrolment.id).set(newEnrolment.toJson());
-        debugPrint('[EnrolmentService] Persisted enrollment ${newEnrolment.id} for user $userId to Firestore.');
+        final deterministicId = '${userId}_$courseId';
+        await firestore.collection('enrolments').doc(deterministicId).set(newEnrolment.toJson());
+        debugPrint('[EnrolmentService] Persisted enrollment $deterministicId for user $userId to Firestore.');
       }
     } catch (e) {
       debugPrint('[EnrolmentService] Local enrolment mode (Firestore sync error: $e)');
