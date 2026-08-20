@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // Helper Functions
+    // =========================================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isCourseInstructor(courseId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
+    }
+
+    // =========================================================================
+    // Users Collection
+    // =========================================================================
+    // Any authenticated user can read profiles; users can only modify their own profile doc.
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // =========================================================================
+    // Courses Collection
+    // =========================================================================
+    // Published courses are publicly readable by students and guests.
+    // Only the course's instructor can create, edit, or delete the course.
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.instructorId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.instructorId == request.auth.uid;
+    }
+
+    // =========================================================================
+    // Enrolments Collection (CRITICAL ACCESS CONTROL)
+    // =========================================================================
+    // 1. Reads are restricted to the enrolled student (request.auth.uid == resource.data.userId)
+    //    or the instructor of the enrolled course.
+    //    Students CANNOT query or view other students' enrolment records.
+    // 2. Writes (creation & progress updates) are restricted to the student's own UID.
+    match /enrolments/{enrolmentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isCourseInstructor(resource.data.courseId)
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if false; // Enrolments cannot be deleted by client apps
+    }
+
+    // =========================================================================
+    // Quizzes & Quiz Attempts Collection
+    // =========================================================================
+    match /quizzes/{quizId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /quizAttempts/{attemptId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isCourseInstructor(resource.data.courseId)
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // Certificates Collection
+    // =========================================================================
+    // Publicly readable so that external verification links & QR codes work without logging in.
+    // Creation/update restricted to the certificate owner or course instructor.
+    match /certificates/{certId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isCourseInstructor(resource.data.courseId)
+      );
+    }
+
+    // =========================================================================
+    // Live Classes Collection
+    // =========================================================================
+    match /liveClasses/{classId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isCourseInstructor(request.resource.data.courseId);
+    }
+  }
+}

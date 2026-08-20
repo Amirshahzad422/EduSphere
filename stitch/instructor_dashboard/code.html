@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EduSphere Instructor Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#e2e2e5",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#1a1c1e",
+                        "on-surface-variant": "#44474a",
+                        "on-background": "#1a1c1e",
+                        "on-tertiary-fixed": "#410006",
+                        "on-secondary-container": "#006e73",
+                        "secondary-fixed": "#6bf6ff",
+                        "surface-container-low": "#f3f3f6",
+                        "secondary": "#00696e",
+                        "surface-variant": "#e2e2e5",
+                        "surface-dim": "#d9dadc",
+                        "inverse-primary": "#c6c6c9",
+                        "tertiary-container": "#410006",
+                        "inverse-surface": "#2f3133",
+                        "on-error": "#ffffff",
+                        "outline-variant": "#c5c6ca",
+                        "on-tertiary-fixed-variant": "#8c1520",
+                        "surface-container-high": "#e8e8ea",
+                        "surface": "#f9f9fb",
+                        "surface-container": "#edeef0",
+                        "background": "#f9f9fb",
+                        "secondary-container": "#61f4fd",
+                        "inverse-on-surface": "#f0f0f3",
+                        "surface-container-highest": "#e2e2e5",
+                        "on-secondary-fixed-variant": "#004f53",
+                        "surface-bright": "#f9f9fb",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#002022",
+                        "surface-tint": "#5d5e61",
+                        "primary": "#000101",
+                        "on-primary-container": "#838486",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#1a1c1e",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#ffb3b0",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#ffdad8",
+                        "on-primary-fixed-variant": "#454749",
+                        "primary-fixed-dim": "#c6c6c9",
+                        "tertiary": "#010000",
+                        "outline": "#75777a",
+                        "secondary-fixed-dim": "#3edae3",
+                        "on-surface": "#1a1c1e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#e05456"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "gutter-mobile": "16px",
+                        "xl": "32px",
+                        "sm": "12px",
+                        "margin-mobile": "20px",
+                        "md": "16px",
+                        "gutter-desktop": "24px",
+                        "base": "8px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "display-lg-mobile": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Inter"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen pb-24 md:pb-0">
+<!-- TopAppBar (Web) / Hidden on Mobile -->
+<header class="hidden md:flex w-full top-0 sticky bg-surface dark:bg-surface-container-high shadow-sm z-40 transition-colors duration-200">
+<div class="flex items-center justify-between px-margin-desktop py-lg w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center overflow-hidden">
+<img class="object-cover w-full h-full" data-alt="A professional headshot of an instructor in a modern, well-lit academic setting. The instructor has a warm, approachable expression. The lighting is soft and cinematic, emphasizing a polished, high-end professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6Sxj28fF8beJmCxsA72rR69E-AbMxsFoLpi7r6Nf4bWRs4fKXGQwiAleaizYmZVq4vH31iJlWS2t0LoDtUnWBNQIHchK_BVLkV0VMANBD0IGzwMaGVPDnDU8RFWqTN_JdbUXTl71U8b6nsm2NIoxO4yzydrw6m-ndwy_7xwjG0XWHdq6qbNtNfJxDNKDvCWqa2q3RpHO3r38PqepCBsV-FLhwV1tYnQ166AWb3zs1--jCvWmh7Dlirw"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">EduSphere Instructor</h1>
+</div>
+<nav class="flex gap-lg">
+<a class="text-primary dark:text-primary-fixed font-label-md text-label-md transition-colors duration-200 hover:bg-surface-container dark:hover:bg-surface-container-highest px-4 py-2 rounded-lg flex items-center gap-2 bg-surface-container dark:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                    Dashboard
+                 </a>
+<a class="text-on-surface-variant dark:text-on-surface-variant font-label-md text-label-md transition-colors duration-200 hover:bg-surface-container dark:hover:bg-surface-container-highest px-4 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+                    Builder
+                 </a>
+<a class="text-on-surface-variant dark:text-on-surface-variant font-label-md text-label-md transition-colors duration-200 hover:bg-surface-container dark:hover:bg-surface-container-highest px-4 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">payments</span>
+                    Earnings
+                 </a>
+<a class="text-on-surface-variant dark:text-on-surface-variant font-label-md text-label-md transition-colors duration-200 hover:bg-surface-container dark:hover:bg-surface-container-highest px-4 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">person</span>
+                    Account
+                 </a>
+</nav>
+<button class="p-2 rounded-full hover:bg-surface-container dark:hover:bg-surface-container-highest transition-colors duration-200 text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<!-- Mobile Top Header (Simplified) -->
+<header class="md:hidden flex items-center justify-between px-margin-mobile py-base w-full bg-surface dark:bg-surface-container-high shadow-sm sticky top-0 z-40">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center overflow-hidden">
+<img class="object-cover w-full h-full" data-alt="A professional headshot of an instructor in a modern, well-lit academic setting. The instructor has a warm, approachable expression. The lighting is soft and cinematic, emphasizing a polished, high-end professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBag1WKNu-kv91-X68OJrXlcH32vV7R7gsbd3PwY4CGphUS17iUPQ36fdPXWULEzuCopuzB7mrFtYHvfb8GFfZJBe4xL17fe4SFruqrUapS6o4_feBKfv3d4nPYIOveRV7e8n3cZGUqNdssP0xWQ_i8z-9VDtepN4-kQHgAnO9wOik2D06JrJG4bdJItCFeoSIesgANIyuHeHG6fTM7prknBa0CAi81jXL6IV6PaLq9mIZavMXyxgrF0Q"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary dark:text-primary-fixed">EduSphere Instructor</h1>
+</div>
+<button class="p-2 text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</header>
+<main class="w-full max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-lg md:py-xl grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-gutter-mobile md:gap-gutter-desktop">
+<!-- Greeting Section -->
+<div class="col-span-4 md:col-span-8 lg:col-span-12 mb-lg">
+<h2 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-background">Good morning, Dr. Chen</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-xs">Here is what's happening with your courses today.</p>
+</div>
+<!-- Metrics Bento Grid -->
+<div class="col-span-4 md:col-span-8 lg:col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-gutter-mobile md:gap-gutter-desktop mb-xl">
+<!-- Stat Card 1 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] flex flex-col gap-base border border-surface-variant">
+<div class="flex items-center gap-sm text-secondary">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Total Students</span>
+</div>
+<div class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">
+                    12.4k
+                </div>
+<div class="font-label-sm text-label-sm text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> +5.2% this month
+                </div>
+</div>
+<!-- Stat Card 2 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] flex flex-col gap-base border border-surface-variant">
+<div class="flex items-center gap-sm text-secondary">
+<span class="material-symbols-outlined">library_books</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Published Courses</span>
+</div>
+<div class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">
+                    8
+                </div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">
+                    2 in draft
+                </div>
+</div>
+<!-- Stat Card 3 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] flex flex-col gap-base border border-surface-variant">
+<div class="flex items-center gap-sm text-secondary">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Monthly Earnings</span>
+</div>
+<div class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">
+                    $4,250
+                </div>
+<div class="font-label-sm text-label-sm text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> +12% vs last month
+                </div>
+</div>
+<!-- Stat Card 4 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] flex flex-col gap-base border border-surface-variant">
+<div class="flex items-center gap-sm text-secondary">
+<span class="material-symbols-outlined">star</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Avg. Rating</span>
+</div>
+<div class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">
+                    4.9
+                </div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">
+                    Based on 1.2k reviews
+                </div>
+</div>
+</div>
+<!-- Main Content Layout (Asymmetric) -->
+<div class="col-span-4 md:col-span-8 lg:col-span-8 flex flex-col gap-lg">
+<!-- Course Performance Chart -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] border border-surface-variant p-lg">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-background">Course Performance</h3>
+<button class="font-label-md text-label-md text-secondary hover:underline">View Detailed Report</button>
+</div>
+<div class="h-64 w-full bg-surface-container-low rounded-lg relative overflow-hidden flex items-end p-4 border border-outline-variant">
+<!-- Simple CSS Bar Chart Representation -->
+<div class="w-full h-full flex items-end gap-2 justify-between">
+<div class="w-full bg-secondary-container rounded-t-sm h-[20%] hover:h-[22%] transition-all"></div>
+<div class="w-full bg-secondary-container rounded-t-sm h-[35%] hover:h-[37%] transition-all"></div>
+<div class="w-full bg-secondary-container rounded-t-sm h-[30%] hover:h-[32%] transition-all"></div>
+<div class="w-full bg-secondary-container rounded-t-sm h-[50%] hover:h-[52%] transition-all"></div>
+<div class="w-full bg-secondary-container rounded-t-sm h-[65%] hover:h-[67%] transition-all"></div>
+<div class="w-full bg-secondary-container rounded-t-sm h-[45%] hover:h-[47%] transition-all"></div>
+<div class="w-full bg-secondary rounded-t-sm h-[85%] hover:h-[87%] transition-all shadow-[0_0_10px_rgba(0,105,110,0.5)]"></div>
+</div>
+</div>
+<div class="flex justify-between mt-xs px-2 font-label-sm text-label-sm text-on-surface-variant">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</section>
+</div>
+<!-- Sidebar Layout -->
+<div class="col-span-4 md:col-span-8 lg:col-span-4 flex flex-col gap-lg">
+<!-- Upcoming Live Classes -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] border border-surface-variant overflow-hidden">
+<div class="bg-primary text-on-primary p-md relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-secondary/20 to-transparent pointer-events-none"></div>
+<h3 class="font-headline-md text-headline-md relative z-10">Upcoming Live Classes</h3>
+</div>
+<div class="p-md flex flex-col gap-md">
+<!-- Scheduled Session -->
+<div class="border-l-4 border-secondary pl-sm py-xs">
+<div class="flex justify-between items-start">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Neural Networks</h4>
+<span class="font-label-sm text-label-sm bg-surface-container-low text-on-surface-variant px-2 py-1 rounded-full">2:00 PM</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 text-sm">Advanced Deep Learning</p>
+<div class="mt-sm flex gap-2">
+<button class="bg-secondary text-on-secondary font-label-sm text-label-sm px-4 py-2 rounded-lg flex items-center gap-1 transition-colors hover:bg-opacity-90">
+<span class="material-symbols-outlined text-[16px]">videocam</span> Join Room
+                            </button>
+</div>
+</div>
+<!-- Another Session -->
+<div class="border-l-4 border-outline-variant pl-sm py-xs opacity-75">
+<div class="flex justify-between items-start">
+<h4 class="font-label-md text-label-md text-on-background">Data Structures</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2 py-1 rounded-full">Tomorrow</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 text-sm">Foundations of CS</p>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-gutter-mobile py-xs bg-surface dark:bg-surface-container shadow-[0px_-4px_12px_0px_rgba(0,0,0,0.1)] z-50">
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-xl p-2 active:scale-95 transition-transform duration-150 w-16" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-sm text-label-sm mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2 active:scale-95 transition-transform duration-150 w-16 hover:bg-surface-container-highest dark:hover:bg-surface-container-high rounded-xl" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-sm text-label-sm mt-1">Builder</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2 active:scale-95 transition-transform duration-150 w-16 hover:bg-surface-container-highest dark:hover:bg-surface-container-high rounded-xl" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-sm text-label-sm mt-1">Earnings</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2 active:scale-95 transition-transform duration-150 w-16 hover:bg-surface-container-highest dark:hover:bg-surface-container-high rounded-xl" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm mt-1">Account</span>
+</a>
+</nav>
+</body></html>

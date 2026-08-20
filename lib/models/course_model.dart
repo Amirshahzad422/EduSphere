@@ -1,0 +1,240 @@
+import 'lesson_model.dart';
+import 'quiz_model.dart';
+
+class InstructorInfo {
+  final String id;
+  final String name;
+  final String title;
+  final String avatarUrl;
+  final String bio;
+  final double rating;
+  final int studentsCount;
+  final int coursesCount;
+
+  const InstructorInfo({
+    required this.id,
+    required this.name,
+    required this.title,
+    required this.avatarUrl,
+    required this.bio,
+    this.rating = 4.9,
+    this.studentsCount = 12500,
+    this.coursesCount = 8,
+  });
+
+  factory InstructorInfo.fromJson(Map<String, dynamic> json) {
+    return InstructorInfo(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      bio: json['bio'] as String? ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 4.9,
+      studentsCount: (json['studentsCount'] as num?)?.toInt() ?? 12500,
+      coursesCount: (json['coursesCount'] as num?)?.toInt() ?? 8,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'title': title,
+      'avatarUrl': avatarUrl,
+      'bio': bio,
+      'rating': rating,
+      'studentsCount': studentsCount,
+      'coursesCount': coursesCount,
+    };
+  }
+}
+
+class CourseModel {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String category;
+  final String instructorId;
+  final InstructorInfo instructor;
+  final double price;
+  final double? originalPrice;
+  final double discount;
+  final String level; // Beginner, Intermediate, Advanced, All Levels
+  final String language;
+  final String duration;
+  final double rating;
+  final int reviewCount;
+  final int enrolmentCount;
+  final String thumbnailUrl;
+  final String previewVideoUrl;
+  final List<ModuleModel> syllabus;
+  final List<String> requirements;
+  final List<String> whatYouWillLearn;
+  final List<QuizModel> quizzes;
+  final bool isFeatured;
+  final bool isTrending;
+  final DateTime? updatedAt;
+
+  const CourseModel({
+    required this.id,
+    required this.title,
+    this.subtitle = '',
+    required this.category,
+    required this.instructorId,
+    required this.instructor,
+    required this.price,
+    this.originalPrice,
+    this.discount = 0.0,
+    this.level = 'All Levels',
+    this.language = 'English',
+    required this.duration,
+    this.rating = 4.8,
+    this.reviewCount = 340,
+    this.enrolmentCount = 1200,
+    required this.thumbnailUrl,
+    this.previewVideoUrl = '',
+    this.syllabus = const [],
+    this.requirements = const [],
+    this.whatYouWillLearn = const [],
+    this.quizzes = const [],
+    this.isFeatured = false,
+    this.isTrending = false,
+    this.updatedAt,
+  });
+
+  factory CourseModel.fromJson(Map<String, dynamic> json) {
+    return CourseModel(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String? ?? '',
+      category: json['category'] as String? ?? 'General',
+      instructorId: json['instructorId'] as String? ?? '',
+      instructor: json['instructor'] != null
+          ? InstructorInfo.fromJson(json['instructor'] as Map<String, dynamic>)
+          : InstructorInfo(
+              id: json['instructorId'] as String? ?? '',
+              name: json['instructorName'] as String? ?? 'EduSphere Instructor',
+              title: 'Senior Specialist',
+              avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+              bio: 'Experienced educator & industry specialist.',
+            ),
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      originalPrice: (json['originalPrice'] as num?)?.toDouble(),
+      discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
+      level: json['level'] as String? ?? 'All Levels',
+      language: json['language'] as String? ?? 'English',
+      duration: json['duration'] as String? ?? '10 hours',
+      rating: (json['rating'] as num?)?.toDouble() ?? 4.8,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 340,
+      enrolmentCount: (json['enrolmentCount'] as num?)?.toInt() ?? 1200,
+      thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
+      previewVideoUrl: json['previewVideoUrl'] as String? ?? '',
+      syllabus: (json['syllabus'] as List<dynamic>?)
+              ?.map((e) => ModuleModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      requirements: (json['requirements'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      whatYouWillLearn: (json['whatYouWillLearn'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      quizzes: (json['quizzes'] as List<dynamic>?)
+              ?.map((e) => QuizModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      isFeatured: json['isFeatured'] as bool? ?? false,
+      isTrending: json['isTrending'] as bool? ?? false,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'subtitle': subtitle,
+      'category': category,
+      'instructorId': instructorId,
+      'instructor': instructor.toJson(),
+      'price': price,
+      'originalPrice': originalPrice,
+      'discount': discount,
+      'level': level,
+      'language': language,
+      'duration': duration,
+      'rating': rating,
+      'reviewCount': reviewCount,
+      'enrolmentCount': enrolmentCount,
+      'thumbnailUrl': thumbnailUrl,
+      'previewVideoUrl': previewVideoUrl,
+      'syllabus': syllabus.map((e) => e.toJson()).toList(),
+      'requirements': requirements,
+      'whatYouWillLearn': whatYouWillLearn,
+      'quizzes': quizzes.map((e) => e.toJson()).toList(),
+      'isFeatured': isFeatured,
+      'isTrending': isTrending,
+      'updatedAt': updatedAt?.toIso8601String(),
+    };
+  }
+
+  int get totalLessons => syllabus.fold(0, (sum, m) => sum + m.lessons.length);
+
+  CourseModel copyWith({
+    String? id,
+    String? title,
+    String? subtitle,
+    String? category,
+    String? instructorId,
+    InstructorInfo? instructor,
+    double? price,
+    double? originalPrice,
+    double? discount,
+    String? level,
+    String? language,
+    String? duration,
+    double? rating,
+    int? reviewCount,
+    int? enrolmentCount,
+    String? thumbnailUrl,
+    String? previewVideoUrl,
+    List<ModuleModel>? syllabus,
+    List<String>? requirements,
+    List<String>? whatYouWillLearn,
+    List<QuizModel>? quizzes,
+    bool? isFeatured,
+    bool? isTrending,
+    DateTime? updatedAt,
+  }) {
+    return CourseModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      category: category ?? this.category,
+      instructorId: instructorId ?? this.instructorId,
+      instructor: instructor ?? this.instructor,
+      price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
+      discount: discount ?? this.discount,
+      level: level ?? this.level,
+      language: language ?? this.language,
+      duration: duration ?? this.duration,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      enrolmentCount: enrolmentCount ?? this.enrolmentCount,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      previewVideoUrl: previewVideoUrl ?? this.previewVideoUrl,
+      syllabus: syllabus ?? this.syllabus,
+      requirements: requirements ?? this.requirements,
+      whatYouWillLearn: whatYouWillLearn ?? this.whatYouWillLearn,
+      quizzes: quizzes ?? this.quizzes,
+      isFeatured: isFeatured ?? this.isFeatured,
+      isTrending: isTrending ?? this.isTrending,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}

@@ -1,0 +1,271 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../layouts/MainLayout.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
+import '../screens/Splash.dart';
+import '../screens/Onboarding.dart';
+import '../screens/Login.dart';
+import '../screens/Register.dart';
+import '../screens/Home.dart';
+import '../screens/Courses.dart';
+import '../screens/CourseDetails.dart';
+import '../screens/Lesson.dart';
+import '../screens/LiveClass.dart';
+import '../screens/Quiz.dart';
+import '../screens/MyLearning.dart';
+import '../screens/Certificates.dart';
+import '../screens/Cart.dart';
+import '../screens/Checkout.dart';
+import '../screens/Wishlist.dart';
+import '../screens/Profile.dart';
+import '../screens/InstructorDashboard.dart';
+import '../screens/CourseBuilder.dart';
+import '../screens/Earnings.dart';
+import '../screens/About.dart';
+import '../screens/Contact.dart';
+import '../screens/NotFound.dart';
+
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
+
+/// List of routes that require instructor role
+const _instructorOnlyRoutes = ['/instructor', '/builder', '/earnings'];
+
+/// List of routes that require user authentication
+const _authenticatedOnlyRoutes = [
+  '/my-learning',
+  '/checkout',
+  '/profile',
+  '/instructor',
+  '/builder',
+  '/earnings',
+];
+
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(Ref ref) {
+    ref.listen<UserModel?>(authProvider, (_, __) {
+      notifyListeners();
+    });
+  }
+}
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = _RouterRefreshNotifier(ref);
+
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/splash',
+    refreshListenable: refreshNotifier,
+    errorBuilder: (context, state) => const NotFoundScreen(),
+    redirect: (context, state) {
+      final authUser = ref.read(authProvider);
+      final loc = state.matchedLocation;
+      final isAuth = authUser != null;
+      final isStudent = authUser?.role == UserRole.student;
+
+      // 1. Auth guard: Redirect unauthenticated users trying to access private screens
+      if (!isAuth && _authenticatedOnlyRoutes.contains(loc)) {
+        return '/login';
+      }
+
+      // 2. Role guard: Prevent Students from opening Instructor pages
+      if (isAuth && isStudent && _instructorOnlyRoutes.contains(loc)) {
+        debugPrint('[Router Guard] Blocked student access to instructor route $loc. Redirecting to /home');
+        return '/home';
+      }
+
+      // 3. Role guard: Prevent Instructors from accidentally entering student marketplace in instructor mode
+      final isInstructor = authUser?.role == UserRole.instructor;
+      if (isAuth && isInstructor && (loc == '/courses' || loc == '/cart' || loc == '/checkout')) {
+        debugPrint('[Router Guard] Blocked instructor from marketplace $loc. Redirecting to /instructor');
+        return '/instructor';
+      }
+
+      return null;
+    },
+    routes: [
+      // Standalone Screens
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+
+      // App Shell Route wrapped in MainLayout (AppBar + BottomNav)
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) {
+          return MainLayout(child: child);
+        },
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: '/courses',
+            builder: (context, state) => const CoursesScreen(),
+          ),
+          GoRoute(
+            path: '/course/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? 'course_1';
+              return CourseDetailsScreen(courseId: id);
+            },
+          ),
+          GoRoute(
+            path: '/lesson/:courseId/:lessonId',
+            builder: (context, state) {
+              final courseId = state.pathParameters['courseId'] ?? 'course_1';
+              final lessonId = state.pathParameters['lessonId'] ?? 'les_1_1_1';
+              return LessonScreen(courseId: courseId, lessonId: lessonId);
+            },
+          ),
+          GoRoute(
+            path: '/live-class/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? 'live_1';
+              return LiveClassScreen(classId: id);
+            },
+          ),
+          GoRoute(
+            path: '/quiz/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? 'quiz_c1';
+              return QuizScreen(quizId: id);
+            },
+          ),
+          GoRoute(
+            path: '/my-learning',
+            builder: (context, state) => const MyLearningScreen(),
+          ),
+          GoRoute(
+            path: '/certificates',
+            builder: (context, state) => const CertificatesScreen(),
+          ),
+          GoRoute(
+            path: '/cart',
+            builder: (context, state) => const CartScreen(),
+          ),
+          GoRoute(
+            path: '/checkout',
+            builder: (context, state) => const CheckoutScreen(),
+          ),
+          GoRoute(
+            path: '/wishlist',
+            builder: (context, state) => const WishlistScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/instructor',
+            builder: (context, state) => const InstructorDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/builder',
+            builder: (context, state) {
+              final courseId = state.uri.queryParameters['courseId'] ?? state.extra as String?;
+              return CourseBuilderScreen(courseId: courseId);
+            },
+          ),
+          GoRoute(
+            path: '/earnings',
+            builder: (context, state) => const EarningsScreen(),
+          ),
+          GoRoute(
+            path: '/about',
+            builder: (context, state) => const AboutScreen(),
+          ),
+          GoRoute(
+            path: '/contact',
+            builder: (context, state) => const ContactScreen(),
+          ),
+        ],
+      ),
+    ],
+  );
+});
+
+// Backward compatibility static router
+final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
+  initialLocation: '/splash',
+  errorBuilder: (context, state) => const NotFoundScreen(),
+  routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/register',
+      builder: (context, state) => const RegisterScreen(),
+    ),
+    ShellRoute(
+      navigatorKey: _shellNavigatorKey,
+      builder: (context, state, child) => MainLayout(child: child),
+      routes: [
+        GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+        GoRoute(path: '/courses', builder: (context, state) => const CoursesScreen()),
+        GoRoute(
+          path: '/course/:id',
+          builder: (context, state) => CourseDetailsScreen(courseId: state.pathParameters['id'] ?? 'course_1'),
+        ),
+        GoRoute(
+          path: '/lesson/:courseId/:lessonId',
+          builder: (context, state) => LessonScreen(
+            courseId: state.pathParameters['courseId'] ?? 'course_1',
+            lessonId: state.pathParameters['lessonId'] ?? 'les_1_1_1',
+          ),
+        ),
+        GoRoute(
+          path: '/live-class/:id',
+          builder: (context, state) => LiveClassScreen(classId: state.pathParameters['id'] ?? 'live_1'),
+        ),
+        GoRoute(
+          path: '/quiz/:id',
+          builder: (context, state) => QuizScreen(quizId: state.pathParameters['id'] ?? 'quiz_c1'),
+        ),
+        GoRoute(path: '/my-learning', builder: (context, state) => const MyLearningScreen()),
+        GoRoute(path: '/certificates', builder: (context, state) => const CertificatesScreen()),
+        GoRoute(path: '/cart', builder: (context, state) => const CartScreen()),
+        GoRoute(path: '/checkout', builder: (context, state) => const CheckoutScreen()),
+        GoRoute(path: '/wishlist', builder: (context, state) => const WishlistScreen()),
+        GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+        GoRoute(path: '/instructor', builder: (context, state) => const InstructorDashboardScreen()),
+        GoRoute(
+          path: '/builder',
+          builder: (context, state) {
+            final courseId = state.uri.queryParameters['courseId'] ?? state.extra as String?;
+            return CourseBuilderScreen(courseId: courseId);
+          },
+        ),
+        GoRoute(path: '/earnings', builder: (context, state) => const EarningsScreen()),
+        GoRoute(path: '/about', builder: (context, state) => const AboutScreen()),
+        GoRoute(path: '/contact', builder: (context, state) => const ContactScreen()),
+      ],
+    ),
+  ],
+);

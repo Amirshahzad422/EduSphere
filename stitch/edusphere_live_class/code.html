@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EduSphere - Live Classroom</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "surface-container-highest": "#e2e2e5",
+                            "on-tertiary-container": "#e05456",
+                            "on-surface": "#1a1c1e",
+                            "primary-fixed-dim": "#c6c6c9",
+                            "on-secondary": "#ffffff",
+                            "surface": "#f9f9fb",
+                            "tertiary-fixed-dim": "#ffb3b0",
+                            "surface-tint": "#5d5e61",
+                            "tertiary-fixed": "#ffdad8",
+                            "background": "#f9f9fb",
+                            "surface-container": "#edeef0",
+                            "primary": "#000101",
+                            "on-secondary-fixed": "#002022",
+                            "on-error-container": "#93000a",
+                            "on-tertiary-fixed": "#410006",
+                            "outline-variant": "#c5c6ca",
+                            "surface-variant": "#e2e2e5",
+                            "error": "#ba1a1a",
+                            "inverse-primary": "#c6c6c9",
+                            "primary-container": "#1a1c1e",
+                            "on-primary-container": "#838486",
+                            "on-surface-variant": "#44474a",
+                            "surface-container-lowest": "#ffffff",
+                            "secondary-container": "#61f4fd",
+                            "secondary-fixed-dim": "#3edae3",
+                            "surface-container-high": "#e8e8ea",
+                            "on-background": "#1a1c1e",
+                            "surface-container-low": "#f3f3f6",
+                            "surface-bright": "#f9f9fb",
+                            "secondary-fixed": "#6bf6ff",
+                            "on-secondary-fixed-variant": "#004f53",
+                            "tertiary": "#010000",
+                            "on-secondary-container": "#006e73",
+                            "on-error": "#ffffff",
+                            "outline": "#75777a",
+                            "on-primary-fixed": "#1a1c1e",
+                            "surface-dim": "#d9dadc",
+                            "secondary": "#00696e",
+                            "inverse-surface": "#2f3133",
+                            "on-tertiary-fixed-variant": "#8c1520",
+                            "on-primary": "#ffffff",
+                            "tertiary-container": "#410006",
+                            "on-primary-fixed-variant": "#454749",
+                            "on-tertiary": "#ffffff",
+                            "error-container": "#ffdad6",
+                            "inverse-on-surface": "#f0f0f3",
+                            "primary-fixed": "#e2e2e5"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "md": "16px",
+                            "gutter-mobile": "16px",
+                            "sm": "12px",
+                            "gutter-desktop": "24px",
+                            "margin-mobile": "20px",
+                            "margin-desktop": "64px",
+                            "xl": "32px",
+                            "lg": "24px",
+                            "base": "8px",
+                            "xs": "4px"
+                    },
+                    "fontFamily": {
+                            "headline-md": ["Plus Jakarta Sans"],
+                            "display-lg-mobile": ["Plus Jakarta Sans"],
+                            "headline-lg": ["Plus Jakarta Sans"],
+                            "label-md": ["Inter"],
+                            "body-md": ["Inter"],
+                            "label-sm": ["Inter"],
+                            "display-lg": ["Plus Jakarta Sans"],
+                            "body-lg": ["Inter"],
+                            "headline-lg-mobile": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "display-lg-mobile": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                            "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                            "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                            "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                            "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                            "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                            "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-primary text-on-primary min-h-screen flex flex-col font-body-md overflow-hidden antialiased">
+<!-- Live Classroom Container - Darker theme intentionally for video focus -->
+<main class="flex-1 relative flex flex-col w-full max-w-[480px] mx-auto bg-black h-[100dvh]">
+<!-- Main Video Feed -->
+<div class="absolute inset-0 z-0 bg-surface-tint">
+<img alt="Instructor Video Feed" class="w-full h-full object-cover opacity-90" data-alt="A medium shot of an Asian female professor in her 40s teaching in a modern, well-lit academic office. She is looking directly at the camera, gesturing slightly as if explaining a complex concept. Behind her is a subtle blurred background featuring a glass whiteboard with neural network diagrams. The lighting is professional studio quality with soft key light, creating a focused, high-end educational aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4lCxyFPMksjuXJaxyPBMvM0Bf3fClodyPYtzaCdipBSx0gQNBVXleazhyR0tu-LnKFIS_AFoybiZ1l0yJOq7O_VdRlSuB-9C4exJQi4dAsDB5bW0RCfQrMHmq1MS02IUhJtWfsYJfaxHpzhnZ-hC6VcQFyRPwqoGduTSX49PzddaZCg9NHjeNZeVfzk2EXy9tXk1ntMo85xhwdbJrDn4cf2hwGT39Qoqct1SF7vkjByYuG2998_JBAw"/>
+</div>
+<!-- Top Gradient Overlay for Header readability -->
+<div class="absolute top-0 w-full h-32 bg-gradient-to-b from-black/70 to-transparent z-10"></div>
+<!-- Header -->
+<header class="relative z-20 flex justify-between items-start px-gutter-mobile py-md w-full">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="flex items-center justify-center bg-error text-on-error font-label-sm text-label-sm px-2 py-0.5 rounded-full uppercase tracking-wider">
+<span class="w-1.5 h-1.5 bg-on-error rounded-full mr-1.5 animate-pulse"></span>
+                        Live
+                    </span>
+<span class="bg-black/50 text-white backdrop-blur-md px-2 py-0.5 rounded-full font-label-sm text-label-sm">
+                        45:12
+                    </span>
+</div>
+<h1 class="font-headline-md text-headline-md text-white drop-shadow-md">CS401: Neural Networks</h1>
+<p class="font-body-md text-body-md text-surface-container-low drop-shadow-md">Dr. Sarah Chen</p>
+</div>
+<button class="bg-black/30 hover:bg-black/50 backdrop-blur-md text-white p-2 rounded-full transition-colors active:scale-95 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<!-- Spacer to push content down -->
+<div class="flex-1 relative z-10"></div>
+<!-- Bottom Gradient Overlay for Controls -->
+<div class="absolute bottom-0 w-full h-64 bg-gradient-to-t from-black/90 via-black/60 to-transparent z-10"></div>
+<!-- Participant Overlay (Row) -->
+<div class="relative z-20 px-gutter-mobile mb-md w-full overflow-x-auto no-scrollbar">
+<div class="flex gap-sm w-max pb-2">
+<!-- Self view / User -->
+<div class="relative w-[72px] h-[96px] rounded-lg overflow-hidden border-2 border-secondary-fixed shadow-lg shrink-0">
+<img alt="Your video" class="w-full h-full object-cover" data-alt="Close up webcam view of a young male student looking attentively at the screen. The background is a typical slightly messy college dorm room blurred out. Natural window light illuminating his face from the side." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBt_2gcnXII1r4LQCrZb2-Tk47qW5YX-ZRZexlgswoULJjTc-keyOpyN5zfiCal9Cdgc6nTanlvex8Fza-7kzDoEGNHBVdN0cWwe6hRqBrLiN2DQuIQFUjZ1IdS60xuh1FgP52Lm7B7mVIyJrtO4jKbBHDZ8S9tBnIlmViDHtTePdLW3aEbaVWFf75gNeaO1_ZiPhTcRD6glmJuRDpD5eNnvP_aAl40_2kqqHqg1DhxPVleoE1-K5mQPA"/>
+<div class="absolute bottom-1 right-1 bg-black/60 p-0.5 rounded text-white flex items-center">
+<span class="material-symbols-outlined text-[12px]" data-icon="mic_off">mic_off</span>
+</div>
+</div>
+<!-- Other participants -->
+<div class="relative w-[72px] h-[96px] rounded-lg overflow-hidden bg-surface-tint border border-white/20 shrink-0">
+<img alt="Participant" class="w-full h-full object-cover opacity-80" data-alt="Webcam view of a female student taking notes, looking down slightly. Minimalist home office background. Good lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBS9JphHHn59GCXgfcRQQReI53JoZidvui2TTUZ_7HXHrvJrafi80Fa_hOwhZehUUFXDIE1UzqSMgKizOrg2SUgLWZIbJti-W-MYksXfRE-qxmEYRuV54nEhLMfAOLw4TvzauwNFCguWzHXSU12QIV6wA_iiXAiVLGm6vJulhftQNzgKFt2p3UEcUq9hP79ES_4KRLJiZHaxrKNYPnB8V0BQFweRdAGDlqmQ2BRkUIsmNgG3XuKMoxcNQ"/>
+</div>
+<div class="relative w-[72px] h-[96px] rounded-lg overflow-hidden bg-surface-tint border border-white/20 shrink-0">
+<div class="absolute inset-0 flex items-center justify-center bg-primary-container text-on-primary-container font-headline-md text-headline-md">
+                        JD
+                    </div>
+<div class="absolute bottom-1 right-1 bg-black/60 p-0.5 rounded text-white flex items-center">
+<span class="material-symbols-outlined text-[12px]" data-icon="mic_off">mic_off</span>
+</div>
+</div>
+<div class="relative w-[72px] h-[96px] rounded-lg overflow-hidden bg-surface-tint border border-white/20 shrink-0">
+<img alt="Participant" class="w-full h-full object-cover opacity-80" data-alt="Webcam view of an older male student wearing glasses, looking thoughtfully at the screen. Bookshelf in the background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnNc6bOXRkuEN9YYxxaKHZ6y_UGYbbCYXM_uBFfepXXjgqBjoQs39x16iGzG8u0YKUQceodmTeWAj9ksVtFjkbd05avDFOUs9kUjvjYppVdradJvH_m8P48h12wq2-4KUBK8v23Mw3pbLMafljytaqKIqNExvUmM8Le5DjZGgMdy1Ms4x2mgaPCaPA1964VJeGkQZGnq5oWp_dhQeyapF90wCZhSvMusglHnLbNX1E5tdeZHAwra_FnQ"/>
+<div class="absolute top-1 right-1 bg-secondary text-on-secondary w-4 h-4 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px]" data-icon="front_hand">front_hand</span>
+</div>
+</div>
+<!-- Plus more indicator -->
+<div class="relative w-[72px] h-[96px] rounded-lg overflow-hidden bg-black/40 backdrop-blur-sm border border-white/20 shrink-0 flex items-center justify-center">
+<span class="font-label-md text-label-md text-white">+24</span>
+</div>
+</div>
+</div>
+<!-- Controls Bar -->
+<div class="relative z-20 px-gutter-mobile pb-margin-mobile pt-sm w-full flex justify-between items-center bg-gradient-to-t from-black via-black/95 to-transparent">
+<button class="flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-full bg-surface-variant/20 hover:bg-surface-variant/30 text-white backdrop-blur-md active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="mic_off" style="font-variation-settings: 'FILL' 1;">mic_off</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-full bg-surface-variant/20 hover:bg-surface-variant/30 text-white backdrop-blur-md active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-full bg-surface-variant/20 hover:bg-surface-variant/30 text-white backdrop-blur-md active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="front_hand">front_hand</span>
+</button>
+<button class="relative flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-full bg-surface-variant/20 hover:bg-surface-variant/30 text-white backdrop-blur-md active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="absolute top-0 right-0 w-3 h-3 bg-error rounded-full border-2 border-black"></span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 w-14 h-14 rounded-full bg-error text-on-error hover:bg-error/90 active:scale-95 transition-all shadow-lg">
+<span class="material-symbols-outlined" data-icon="call_end" style="font-variation-settings: 'FILL' 1;">call_end</span>
+</button>
+</div>
+</main>
+<style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

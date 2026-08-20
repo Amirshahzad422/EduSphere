@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Payment Success - EduSphere</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#f9f9fb",
+                        "surface-tint": "#5d5e61",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#c5c6ca",
+                        "on-background": "#1a1c1e",
+                        "primary": "#000101",
+                        "secondary-fixed-dim": "#3edae3",
+                        "error": "#ba1a1a",
+                        "surface-container-highest": "#e2e2e5",
+                        "inverse-primary": "#c6c6c9",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002022",
+                        "on-primary-fixed-variant": "#454749",
+                        "surface-container": "#edeef0",
+                        "inverse-surface": "#2f3133",
+                        "primary-container": "#1a1c1e",
+                        "on-secondary-container": "#006e73",
+                        "inverse-on-surface": "#f0f0f3",
+                        "error-container": "#ffdad6",
+                        "background": "#f9f9fb",
+                        "secondary-container": "#61f4fd",
+                        "tertiary-fixed-dim": "#ffb3b0",
+                        "on-primary-container": "#838486",
+                        "tertiary-container": "#410006",
+                        "surface-container-low": "#f3f3f6",
+                        "secondary": "#00696e",
+                        "on-error": "#ffffff",
+                        "on-surface": "#1a1c1e",
+                        "secondary-fixed": "#6bf6ff",
+                        "primary-fixed-dim": "#c6c6c9",
+                        "primary-fixed": "#e2e2e5",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#410006",
+                        "on-surface-variant": "#44474a",
+                        "surface-variant": "#e2e2e5",
+                        "on-primary-fixed": "#1a1c1e",
+                        "on-secondary-fixed-variant": "#004f53",
+                        "on-tertiary-container": "#e05456",
+                        "surface": "#f9f9fb",
+                        "tertiary-fixed": "#ffdad8",
+                        "on-error-container": "#93000a",
+                        "surface-container-high": "#e8e8ea",
+                        "outline": "#75777a",
+                        "surface-dim": "#d9dadc",
+                        "tertiary": "#010000",
+                        "on-tertiary-fixed-variant": "#8c1520",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "lg": "24px",
+                        "margin-desktop": "64px",
+                        "sm": "12px",
+                        "xs": "4px",
+                        "gutter-desktop": "24px",
+                        "margin-mobile": "20px",
+                        "gutter-mobile": "16px",
+                        "base": "8px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "display-lg-mobile": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center justify-center font-body-md antialiased px-margin-mobile md:px-margin-desktop">
+<!-- Top Navigation Placeholder - Intentionally hidden for transactional screen per Shared Components logic -->
+<main class="w-full max-w-[600px] flex flex-col items-center text-center">
+<!-- Success Icon -->
+<div class="w-24 h-24 bg-secondary-container/20 rounded-full flex items-center justify-center mb-lg">
+<span class="material-symbols-outlined text-secondary" style="font-size: 48px; font-variation-settings: 'FILL' 1;">
+                check_circle
+            </span>
+</div>
+<!-- Headings -->
+<h1 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-sm">
+            Payment Successful!
+        </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-xl max-w-[400px]">
+            Your enrollment is complete. You can now start learning.
+        </p>
+<!-- Course Summary Card -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.1)] border-t-[4px] border-secondary p-lg mb-xl text-left flex flex-col md:flex-row gap-lg items-center">
+<div class="w-full md:w-32 h-32 rounded-lg bg-surface-container-low overflow-hidden flex-shrink-0 relative">
+<img class="object-cover w-full h-full absolute inset-0" data-alt="A sophisticated, high-quality photograph representing machine learning concepts. The image should feature glowing, interconnected neural network nodes against a pristine white background. Accents of deep navy blue and electric teal should highlight the connections. The lighting is high-key and studio-quality, conveying a sense of academic precision, modern technology, and clarity. 8k resolution, photorealistic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJp5g80KqADkv8UGLmuJuCfRYij8dNgYoHJYOGs91Glf2T4YZGZzviRh6sAdvi-OS1FjdYScIpwv-4DVXp4ILvdGEjaXUkAZlG_OBq-FmCWDsbZqiFE82_0ydAgKMaFOEoBQVRysLaZCS2w-X7RwW_CrfgRoOShDaoMHhO6KZB7SvI9_T_w5Cu_Jk2Qh8QaHs_8GdSYrF7w-D5BBJj7oIUWMJ2FJ-fXWNiNLBexBfS_js3TT80G16YKg"/>
+</div>
+<div class="flex-grow">
+<div class="flex items-center gap-2 mb-xs">
+<span class="bg-secondary-container/20 text-secondary font-label-sm text-label-sm px-2 py-1 rounded-full">New Course</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-primary mb-xs">Machine Learning Foundations</h2>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">school</span>
+                    Dr. Alan Turing
+                </p>
+<div class="mt-sm flex gap-md">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-md text-label-md">8 Weeks</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">signal_cellular_alt</span>
+<span class="font-label-md text-label-md">Beginner</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col sm:flex-row gap-md w-full justify-center">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-lg py-sm rounded-lg hover:bg-surface-tint transition-colors duration-200">
+                Start Learning
+            </button>
+<button class="bg-transparent border border-outline text-on-surface font-label-md text-label-md px-lg py-sm rounded-lg hover:bg-surface-container-low transition-colors duration-200">
+                Go to My Learning
+            </button>
+</div>
+</main>
+<!-- Bottom Navigation Placeholder - Intentionally hidden for transactional screen per Shared Components logic -->
+</body></html>

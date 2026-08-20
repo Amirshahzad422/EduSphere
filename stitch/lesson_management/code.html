@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EduSphere - Lesson Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#e2e2e5",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#6bf6ff",
+                        "inverse-primary": "#c6c6c9",
+                        "surface-container-low": "#f3f3f6",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#e05456",
+                        "outline": "#75777a",
+                        "secondary-container": "#61f4fd",
+                        "on-tertiary-fixed-variant": "#8c1520",
+                        "inverse-on-surface": "#f0f0f3",
+                        "tertiary-fixed": "#ffdad8",
+                        "on-primary-container": "#838486",
+                        "surface-container": "#edeef0",
+                        "surface-container-high": "#e8e8ea",
+                        "on-secondary-fixed": "#002022",
+                        "on-primary-fixed-variant": "#454749",
+                        "on-secondary-container": "#006e73",
+                        "on-error-container": "#93000a",
+                        "surface-variant": "#e2e2e5",
+                        "on-secondary-fixed-variant": "#004f53",
+                        "outline-variant": "#c5c6ca",
+                        "on-background": "#1a1c1e",
+                        "on-secondary": "#ffffff",
+                        "background": "#f9f9fb",
+                        "inverse-surface": "#2f3133",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#ffb3b0",
+                        "tertiary-container": "#410006",
+                        "surface-tint": "#5d5e61",
+                        "tertiary": "#010000",
+                        "on-error": "#ffffff",
+                        "primary-fixed": "#e2e2e5",
+                        "primary-container": "#1a1c1e",
+                        "surface-dim": "#d9dadc",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#1a1c1e",
+                        "on-surface-variant": "#44474a",
+                        "primary": "#000101",
+                        "surface-bright": "#f9f9fb",
+                        "surface": "#f9f9fb",
+                        "on-tertiary-fixed": "#410006",
+                        "secondary-fixed-dim": "#3edae3",
+                        "secondary": "#00696e",
+                        "primary-fixed-dim": "#c6c6c9",
+                        "on-surface": "#1a1c1e",
+                        "on-tertiary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter-desktop": "24px",
+                        "margin-desktop": "64px",
+                        "base": "8px",
+                        "lg": "24px",
+                        "sm": "12px",
+                        "margin-mobile": "20px",
+                        "md": "16px",
+                        "xl": "32px",
+                        "gutter-mobile": "16px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "display-lg-mobile": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col md:flex-row">
+<!-- Mobile Bottom Navigation (Hidden on Desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-gutter-mobile py-xs bg-surface shadow-[0px_-4px_12px_0px_rgba(0,0,0,0.1)] z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-highest transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl p-2 hover:bg-surface-container-highest transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-label-sm text-label-sm mt-1">Builder</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-highest transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-sm text-label-sm mt-1">Earnings</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-highest transition-transform duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm mt-1">Account</span>
+</a>
+</nav>
+<!-- Desktop Side Navigation (Hidden on Mobile) -->
+<aside class="hidden md:flex flex-col w-64 bg-surface border-r border-outline-variant min-h-screen sticky top-0 py-lg px-md">
+<div class="mb-xl px-sm">
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">EduSphere Instructor</h1>
+</div>
+<nav class="flex-1 space-y-sm">
+<a class="flex items-center gap-md px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-md px-sm py-sm rounded-lg bg-secondary-container text-on-secondary-container font-semibold hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-md text-label-md">Builder</span>
+</a>
+<a class="flex items-center gap-md px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-md text-label-md">Earnings</span>
+</a>
+<a class="flex items-center gap-md px-sm py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-label-md">Account</span>
+</a>
+</nav>
+<div class="mt-auto pt-lg border-t border-outline-variant px-sm flex items-center gap-md">
+<img alt="Instructor Profile" class="w-10 h-10 rounded-full object-cover shadow-sm" data-alt="A small, circular avatar portrait of an instructor wearing professional yet modern attire, set against a bright, clean, well-lit studio background reflecting a trustworthy and competent corporate identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCN-VnAZj7GgOeGNF78KjEWL4qH31FwE4cHIYMhWysS1AVMPeToESBx6d_A8FIh6WGQRB0yUQ8Y_3inSv-HDl-SlYGFxZOb6pPcFYhpHUKSG9jH9VKDAmsjCA8X_9SFSbDos4YKd4blbqQ7u-t-PXHB5SXbf-Hl8yZNDDc6Ur_ZTcaZOEHYeEBDZxbsMPEjjOthTeAgvPHDSqRMtpUJuYxB3Tfg6XmFFLKOgzfhgYbfdJtW1JMI4_Oxag"/>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Instructor Name</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Profile Settings</p>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 pb-24 md:pb-lg">
+<!-- Mobile Top App Bar -->
+<header class="md:hidden flex items-center justify-between px-margin-mobile py-base w-full bg-surface shadow-sm sticky top-0 z-40 transition-colors duration-200">
+<div class="flex items-center gap-md">
+<img alt="Instructor Profile" class="w-8 h-8 rounded-full object-cover" data-alt="A small, circular avatar portrait of an instructor wearing professional yet modern attire, set against a bright, clean, well-lit studio background reflecting a trustworthy and competent corporate identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAczXuhhDRqp0Gbhs1qzVONUV06OyuPmRCnAOZoWNI-0D2BrL1tgGsI9gm_1_x8__9VfJxKvQ5uHQ4QWS-0WyPVWKySbuJnzXg5RoN4FjMVYphieP-VSLOeeSvbig8Mf64VbV0zM7N11Jgavzm3B-vKHoXIhgfJSAw-vYQIYE3m-LAV9wDhCgSn_y99GbmZeKSil6p0RHzscIEM6FLMlkpabEJUZN12vI0Pu4n9lvvFZnr-dGA7teAhAQ"/>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary tracking-tight">EduSphere Instructor</h1>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container p-2 rounded-full transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-lg md:py-xl">
+<!-- Page Header -->
+<div class="mb-xl">
+<h2 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-background mb-base">Lesson Management</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Manage your course curriculum and content.</p>
+</div>
+<!-- Course Selector -->
+<div class="mb-xl bg-surface-container-lowest p-md md:p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant">
+<label class="block font-label-md text-label-md text-on-surface mb-sm" for="course-select">Select Course</label>
+<div class="relative">
+<select class="appearance-none w-full bg-surface-container-lowest border border-outline text-on-surface py-sm px-md pr-xl rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary font-body-md transition-all duration-200" id="course-select">
+<option>Advanced UI/UX Design Principles</option>
+<option>Introduction to WebGL</option>
+<option>Mastering CSS Grid</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-md text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Curriculum Builder Area -->
+<div class="space-y-lg">
+<!-- Section 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant overflow-hidden">
+<!-- Section Header -->
+<div class="bg-surface-container-low px-md py-sm border-b border-outline-variant flex items-center justify-between cursor-move hover:bg-surface-container transition-colors duration-200">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-outline">drag_indicator</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Section 1: Introduction</h3>
+</div>
+<div class="flex items-center gap-sm">
+<button class="text-on-surface-variant hover:text-primary transition-colors duration-200 p-1 rounded hover:bg-surface-container-highest"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-on-surface-variant hover:text-error transition-colors duration-200 p-1 rounded hover:bg-error-container"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</div>
+<!-- Lesson List -->
+<div class="divide-y divide-outline-variant">
+<!-- Lesson Item 1 -->
+<div class="px-md py-sm flex items-center justify-between hover:bg-surface-bright transition-colors duration-200 group">
+<div class="flex items-center gap-md flex-1">
+<span class="material-symbols-outlined text-outline cursor-move opacity-0 group-hover:opacity-100 transition-opacity">drag_indicator</span>
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-secondary-container text-[16px]">play_circle</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">1. Welcome to the Course</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Video • 02:30</p>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<span class="px-2 py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center gap-xs"><span class="w-2 h-2 rounded-full bg-secondary"></span> Published</span>
+<div class="flex items-center gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+</div>
+<!-- Lesson Item 2 -->
+<div class="px-md py-sm flex items-center justify-between hover:bg-surface-bright transition-colors duration-200 group">
+<div class="flex items-center gap-md flex-1">
+<span class="material-symbols-outlined text-outline cursor-move opacity-0 group-hover:opacity-100 transition-opacity">drag_indicator</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">article</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">2. Course Objectives &amp; Overview</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Text • 5 min read</p>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<span class="px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm flex items-center gap-xs"><span class="w-2 h-2 rounded-full bg-outline"></span> Draft</span>
+<div class="flex items-center gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="text-outline hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Add Lesson Button within Section -->
+<div class="px-md py-sm bg-surface-bright border-t border-outline-variant">
+<button class="flex items-center gap-sm text-secondary hover:text-on-secondary-fixed-variant font-label-md text-label-md transition-colors duration-200">
+<span class="material-symbols-outlined text-[20px]">add</span> Add Lesson
+                         </button>
+</div>
+</div>
+<!-- Global Add Actions -->
+<div class="flex gap-md mt-xl pt-lg border-t border-outline-variant">
+<button class="px-lg py-sm bg-primary text-on-primary font-label-md text-label-md rounded-lg hover:bg-on-primary-fixed-variant transition-colors duration-200 shadow-sm flex items-center gap-sm">
+<span class="material-symbols-outlined text-[20px]">add_box</span>
+                        Add New Section
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

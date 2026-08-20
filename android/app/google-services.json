@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1078631241013",
+    "project_id": "edusphere-ae8ed",
+    "storage_bucket": "edusphere-ae8ed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078631241013:android:44fac264c23f1ac1aea87c",
+        "android_client_info": {
+          "package_name": "com.verexon.edusphere"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1078631241013-dbq8s09qapseiq8grgsf83tc2hk7in74.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgyLQkJb-MHlIJAlrq4_3AJB0yroaxqVY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1078631241013-dbq8s09qapseiq8grgsf83tc2hk7in74.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
