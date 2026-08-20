@@ -327,23 +327,28 @@ class _QuizWidgetState extends State<QuizWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Question ${_currentQuestionIndex + 1} of $totalQuestions',
-                    style: AppTypography.labelMedium.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w800,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Question ${_currentQuestionIndex + 1} of $totalQuestions',
+                      style: AppTypography.labelMedium.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.quiz.title,
-                    style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.quiz.title,
+                      style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -506,8 +511,11 @@ class _QuizWidgetState extends State<QuizWidget> {
           const SizedBox(height: 28),
 
           // Navigation Buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               if (_currentQuestionIndex > 0)
                 AppButton(

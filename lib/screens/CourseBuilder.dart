@@ -350,9 +350,13 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                 children: [
                   Icon(isEditing ? Icons.video_settings : Icons.video_library, color: AppColors.secondary),
                   const SizedBox(width: 10),
-                  Text(
-                    isEditing ? 'Edit Lesson & Content' : 'Add Lesson & Upload Content',
-                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                  Expanded(
+                    child: Text(
+                      isEditing ? 'Edit Lesson & Content' : 'Add Lesson & Upload Content',
+                      style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -411,9 +415,13 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                               children: [
                                 const Icon(Icons.cloud_upload_outlined, color: AppColors.secondary, size: 20),
                                 const SizedBox(width: 8),
-                                Text(
-                                  isEditing ? 'Lecture Video Stream' : 'Cloudinary Video Upload',
-                                  style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                Expanded(
+                                  child: Text(
+                                    isEditing ? 'Lecture Video Stream' : 'Cloudinary Video Upload',
+                                    style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -898,9 +906,13 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                 children: [
                   Icon(isEditing ? Icons.edit_note : Icons.help_outline, color: AppColors.secondary),
                   const SizedBox(width: 8),
-                  Text(
-                    isEditing ? 'Edit Quiz Question' : 'Add Question',
-                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                  Expanded(
+                    child: Text(
+                      isEditing ? 'Edit Quiz Question' : 'Add Question',
+                      style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -923,10 +935,12 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       const SizedBox(height: 14),
 
                       // Question Type Selector
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text('Type: ', style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-                          const SizedBox(width: 8),
                           ChoiceChip(
                             label: const Text('Multiple Choice'),
                             selected: selectedType == QuestionType.multipleChoice,
@@ -945,7 +959,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                               }
                             },
                           ),
-                          const SizedBox(width: 8),
                           ChoiceChip(
                             label: const Text('True / False'),
                             selected: selectedType == QuestionType.trueFalse,
@@ -1124,9 +1137,13 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                 children: [
                   Icon(isEditing ? Icons.quiz : Icons.add_task, color: AppColors.secondary),
                   const SizedBox(width: 10),
-                  Text(
-                    isEditing ? 'Edit Quiz & Assessment' : 'Create New Course Quiz',
-                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                  Expanded(
+                    child: Text(
+                      isEditing ? 'Edit Quiz & Assessment' : 'Create New Course Quiz',
+                      style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -1176,8 +1193,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       const SizedBox(height: 20),
 
                       // Questions Management Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           Text(
                             'Questions (${draftQuestions.length})',
@@ -1302,12 +1322,16 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                               const Icon(Icons.check_circle, size: 12, color: AppColors.success),
                                               const SizedBox(width: 4),
                                             ],
-                                            Text(
-                                              opt.text,
-                                              style: AppTypography.bodySmall.copyWith(
-                                                fontSize: 11,
-                                                fontWeight: opt.isCorrect ? FontWeight.w700 : FontWeight.normal,
-                                                color: opt.isCorrect ? AppColors.success : AppColors.onSurface,
+                                            Flexible(
+                                              child: Text(
+                                                opt.text,
+                                                style: AppTypography.bodySmall.copyWith(
+                                                  fontSize: 11,
+                                                  fontWeight: opt.isCorrect ? FontWeight.w700 : FontWeight.normal,
+                                                  color: opt.isCorrect ? AppColors.success : AppColors.onSurface,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
@@ -1648,22 +1672,23 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       ),
                     ],
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (_isEditMode) ...[
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.error,
                             side: const BorderSide(color: AppColors.error),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedSm),
                           ),
                           icon: const Icon(Icons.delete_forever, size: 18),
                           label: const Text('Delete Course', style: TextStyle(fontWeight: FontWeight.w700)),
                           onPressed: _handleDeleteCourse,
                         ),
-                        const SizedBox(width: 12),
                       ],
                       AppButton(
                         label: _isPublishing
@@ -1780,8 +1805,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      runSpacing: 8,
                       children: [
                         Text('Curriculum Modules', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800)),
                         AppButton(
@@ -1818,7 +1846,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   ConstrainedBox(
-                                    constraints: BoxConstraints(maxWidth: isDesktop ? 600 : 220),
+                                    constraints: BoxConstraints(maxWidth: isDesktop ? 600 : 180),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -1847,8 +1875,10 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                       ],
                                     ),
                                   ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       IconButton(
                                         padding: EdgeInsets.zero,
@@ -1857,7 +1887,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                         tooltip: 'Rename / Edit Module',
                                         onPressed: () => _showModuleDialog(editIndex: modIdx),
                                       ),
-                                      const SizedBox(width: 4),
                                       AppButton(
                                         label: 'Add Lesson',
                                         variant: ButtonVariant.outline,
@@ -1865,7 +1894,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                         icon: Icons.video_call,
                                         onPressed: () => _showAddOrEditLessonModal(modIdx),
                                       ),
-                                      const SizedBox(width: 4),
                                       IconButton(
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -1953,12 +1981,16 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                                           children: [
                                                             const Icon(Icons.attachment, size: 10, color: AppColors.secondary),
                                                             const SizedBox(width: 2),
-                                                            Text(
-                                                              '${les.resources.length} file(s)',
-                                                              style: AppTypography.labelSmall.copyWith(
-                                                                fontSize: 10,
-                                                                color: AppColors.secondary,
-                                                                fontWeight: FontWeight.w700,
+                                                            Flexible(
+                                                              child: Text(
+                                                                '${les.resources.length} file(s)',
+                                                                style: AppTypography.labelSmall.copyWith(
+                                                                  fontSize: 10,
+                                                                  color: AppColors.secondary,
+                                                                  fontWeight: FontWeight.w700,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
                                                               ),
                                                             ),
                                                           ],
@@ -1970,11 +2002,15 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                             ),
                                           ),
                                           IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                                             icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.secondary),
                                             tooltip: 'Edit / Replace Video & Resources',
                                             onPressed: () => _showAddOrEditLessonModal(modIdx, lessonIndex: lesIdx),
                                           ),
                                           IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                                             icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
                                             tooltip: 'Delete Lesson & Clean Storage',
                                             onPressed: () => _removeLesson(modIdx, lesIdx),
@@ -2011,11 +2047,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       alignment: WrapAlignment.spaceBetween,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
                           children: [
                             const Icon(Icons.quiz_outlined, color: AppColors.secondary, size: 22),
-                            const SizedBox(width: 8),
                             Text('Course Quizzes & Assessments', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800)),
                           ],
                         ),

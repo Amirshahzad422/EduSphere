@@ -93,26 +93,42 @@ class _NotFoundScreenState extends State<NotFoundScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        label: 'Return to Home',
-                        variant: ButtonVariant.primary,
-                        icon: Icons.home,
-                        onPressed: () => context.go('/home'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: AppButton(
-                        label: 'Browse Courses',
-                        variant: ButtonVariant.secondary,
-                        icon: Icons.school,
-                        onPressed: () => context.go('/courses'),
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, btnConstraints) {
+                    final isNarrow = btnConstraints.maxWidth < 360;
+                    final homeBtn = AppButton(
+                      label: 'Return to Home',
+                      variant: ButtonVariant.primary,
+                      icon: Icons.home,
+                      isFullWidth: isNarrow,
+                      onPressed: () => context.go('/home'),
+                    );
+                    final browseBtn = AppButton(
+                      label: 'Browse Courses',
+                      variant: ButtonVariant.secondary,
+                      icon: Icons.school,
+                      isFullWidth: isNarrow,
+                      onPressed: () => context.go('/courses'),
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          homeBtn,
+                          const SizedBox(height: 10),
+                          browseBtn,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: homeBtn),
+                        const SizedBox(width: 12),
+                        Expanded(child: browseBtn),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

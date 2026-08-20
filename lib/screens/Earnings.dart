@@ -96,11 +96,15 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     children: [
                       const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
                       const SizedBox(width: 8),
-                      Text(
-                        'Back to Instructor Dashboard',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          'Back to Instructor Dashboard',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

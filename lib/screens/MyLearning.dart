@@ -561,85 +561,113 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 480;
+
+          final iconWidget = Container(
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.error.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.videocam_rounded, color: AppColors.error, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+            child: const Icon(Icons.videocam_rounded, color: AppColors.error, size: 24),
+          );
+
+          final detailsWidget = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: AppSpacing.roundedFull,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'LIVE NOW',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Live class in session for your enrolled curriculum!',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                liveClass.title,
+                style: AppTypography.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          );
+
+          final joinButton = AppButton(
+            label: 'Join Live Room',
+            variant: ButtonVariant.danger,
+            size: isCompact ? ButtonSize.sm : ButtonSize.md,
+            isFullWidth: isCompact,
+            icon: Icons.play_arrow_rounded,
+            onPressed: () => context.go('/live-class/${liveClass.id}'),
+          );
+
+          if (isCompact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: AppSpacing.roundedFull,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'LIVE NOW',
-                            style: AppTypography.labelSmall.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Live class in session for your enrolled curriculum!',
-                        style: AppTypography.labelSmall.copyWith(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    iconWidget,
+                    const SizedBox(width: 10),
+                    Expanded(child: detailsWidget),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  liveClass.title,
-                  style: AppTypography.titleMedium.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                const SizedBox(height: 12),
+                joinButton,
               ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          AppButton(
-            label: 'Join Live Room',
-            variant: ButtonVariant.danger,
-            size: ButtonSize.md,
-            icon: Icons.play_arrow_rounded,
-            onPressed: () => context.go('/live-class/${liveClass.id}'),
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              iconWidget,
+              const SizedBox(width: 14),
+              Expanded(child: detailsWidget),
+              const SizedBox(width: 14),
+              joinButton,
+            ],
+          );
+        },
       ),
     );
   }

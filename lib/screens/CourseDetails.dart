@@ -84,11 +84,15 @@ class CourseDetailsScreen extends ConsumerWidget {
                         children: [
                           const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
                           const SizedBox(width: 8),
-                          Text(
-                            backLabel,
-                            style: AppTypography.labelMedium.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w700,
+                          Flexible(
+                            child: Text(
+                              backLabel,
+                              style: AppTypography.labelMedium.copyWith(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -533,8 +537,11 @@ class CourseDetailsScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 4,
           children: [
             Text('Course Curriculum', style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800)),
             Text(
@@ -686,14 +693,16 @@ class CourseDetailsScreen extends ConsumerWidget {
                                   : null,
                             ),
                             const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(r.userName, style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700)),
-                                Text(formattedDate, style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 10)),
-                              ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(r.userName, style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text(formattedDate, style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 10)),
+                                ],
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             Row(
                               children: List.generate(
                                 5,

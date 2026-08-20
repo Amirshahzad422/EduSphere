@@ -706,15 +706,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          isInstructor ? 'Instructor Accreditations' : 'Earned Badges',
-                          style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                        Expanded(
+                          child: Text(
+                            isInstructor ? 'Instructor Accreditations' : 'Earned Badges',
+                            style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        if (!isInstructor)
+                        if (!isInstructor) ...[
+                          const SizedBox(width: 8),
                           TextButton(
                             onPressed: () => context.go('/certificates'),
                             child: const Text('View All Awards →'),
                           ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 14),

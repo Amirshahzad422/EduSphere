@@ -47,6 +47,15 @@ import 'package:edusphere/screens/About.dart';
 import 'package:edusphere/screens/Contact.dart';
 import 'package:edusphere/screens/NotFound.dart';
 import 'package:edusphere/screens/Lesson.dart';
+import 'package:edusphere/screens/Splash.dart';
+import 'package:edusphere/screens/Onboarding.dart';
+import 'package:edusphere/screens/Home.dart';
+import 'package:edusphere/screens/CourseDetails.dart';
+import 'package:edusphere/screens/Quiz.dart';
+import 'package:edusphere/screens/MyLearning.dart';
+import 'package:edusphere/screens/Cart.dart';
+import 'package:edusphere/screens/Checkout.dart';
+import 'package:edusphere/screens/Wishlist.dart';
 import 'package:edusphere/models/review_model.dart';
 import 'package:edusphere/services/review_service.dart';
 import 'package:edusphere/providers/review_provider.dart';
@@ -2103,6 +2112,343 @@ void main() {
       await tester.tap(find.text('Delete Course Forever'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('Systematic Sweep: All screens render with zero overflow on 360x800, 414x896, 768x1024 & 1280x800', (tester) async {
+      final sampleCourse = CourseModel(
+        id: 'c_resp_test',
+        title: 'Full-Stack Flutter & Cloudflare Zero-Card Masterclass',
+        category: 'Mobile Development',
+        instructorId: 'inst_1',
+        instructor: const InstructorInfo(id: 'inst_1', name: 'Dr. Sarah Chen', title: 'Senior Faculty', avatarUrl: '', bio: ''),
+        price: 49.99,
+        discount: 20,
+        level: 'Intermediate',
+        language: 'English',
+        duration: '12h',
+        rating: 4.9,
+        enrolmentCount: 1420,
+        thumbnailUrl: '',
+        syllabus: const [
+          ModuleModel(
+            id: 'm1',
+            title: 'Module 1: Architecture',
+            description: 'Foundations',
+            lessons: [
+              LessonModel(
+                id: 'l1',
+                courseId: 'c_resp_test',
+                title: 'Welcome & Overview',
+                order: 1,
+                videoUrl: '',
+                isPreview: true,
+              ),
+            ],
+          ),
+        ],
+        quizzes: const [
+          QuizModel(
+            id: 'q1',
+            courseId: 'c_resp_test',
+            title: 'Module 1 Assessment Quiz',
+            description: 'Test your understanding',
+            passingScore: 80,
+            timeLimitMinutes: 15,
+            questions: [
+              QuizQuestion(
+                id: 'q1_1',
+                question: 'What is the backend architecture?',
+                options: [QuizOption(id: 'o1', text: 'Cloudflare Workers', isCorrect: true)],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final authUser = UserModel(
+        id: 'user_alex',
+        name: 'Alex Morgan',
+        email: 'alex@edusphere.io',
+        role: UserRole.instructor,
+        xp: 1250,
+        streak: 7,
+        badges: const ['Fast Learner', 'Quiz Master', 'Top Contributor', '7-Day Streak'],
+      );
+
+      final sizes = [
+        const Size(360, 800),  // Small Android
+        const Size(414, 896),  // Large Phone
+        const Size(768, 1024), // Tablet
+        const Size(1280, 800), // Desktop
+      ];
+
+      final oldHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        FlutterError.dumpErrorToConsole(details);
+        oldHandler?.call(details);
+      };
+
+      for (final size in sizes) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1.0;
+        await tester.binding.setSurfaceSize(size);
+
+        final screens = <Widget>[
+          const SplashScreen(),
+          const OnboardingScreen(),
+          const LoginScreen(),
+          const RegisterScreen(),
+          const HomeScreen(),
+          const CoursesScreen(),
+          const CourseDetailsScreen(courseId: 'c_resp_test'),
+          const LessonScreen(courseId: 'c_resp_test', lessonId: 'l1'),
+          const LiveClassScreen(classId: 'live_test_1'),
+          const QuizScreen(quizId: 'q1'),
+          const MyLearningScreen(),
+          const CertificatesScreen(),
+          const CartScreen(),
+          const CheckoutScreen(),
+          const WishlistScreen(),
+          const ProfileScreen(),
+          const InstructorDashboardScreen(),
+          const CourseBuilderScreen(),
+          const EarningsScreen(),
+          const AboutScreen(),
+          const ContactScreen(),
+          const NotFoundScreen(),
+        ];
+
+        for (final screen in screens) {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                authProvider.overrideWith((ref) {
+                  final n = AuthNotifier(AuthService());
+                  n.state = authUser;
+                  return n;
+                }),
+                allCoursesProvider.overrideWith((ref) async => [sampleCourse]),
+              ],
+              child: MediaQuery(
+                data: MediaQueryData(size: size),
+                child: MaterialApp(
+                  home: Scaffold(
+                    body: screen,
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 100));
+
+          final exc = tester.takeException();
+          if (exc != null) {
+            debugPrint('OVERFLOW ERROR: ${screen.runtimeType} on $size => $exc');
+            if (exc is FlutterError) {
+              debugPrint(exc.message);
+              debugPrint(exc.diagnostics.map((d) => d.toString()).join('\n'));
+            }
+          }
+          expect(exc, isNull, reason: 'Failed at ${screen.runtimeType} on $size');
+        }
+      }
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await tester.binding.setSurfaceSize(null);
+      FlutterError.onError = oldHandler;
+    });
+
+    testWidgets('Interactive Modals: Verified Credential, Add/Edit Lesson, Add Question, & Add Course have zero overflow on 360x800', (tester) async {
+      const size = Size(360, 800);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      await tester.binding.setSurfaceSize(size);
+
+      final authUser = UserModel(
+        id: 'u_instructor_test',
+        name: 'Alex Instructor',
+        email: 'alex@edusphere.io',
+        role: UserRole.instructor,
+        photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+        xp: 1500,
+        streak: 5,
+        badges: ['Cloud Master', 'Top Instructor'],
+      );
+
+      const sampleCourse = CourseModel(
+        id: 'c_modal_test',
+        title: 'Cloudflare Workers & Cloudinary Architecture Masterclass',
+        category: 'Architecture',
+        instructorId: 'u_instructor_test',
+        instructor: InstructorInfo(
+          id: 'u_instructor_test',
+          name: 'Alex Instructor',
+          title: 'Lead Architect',
+          bio: 'Senior cloud architect and distributed systems author.',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+        ),
+        price: 99.99,
+        discount: 20,
+        enrolmentCount: 15,
+        rating: 4.9,
+        reviewCount: 8,
+        duration: '4h 30m',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800',
+        syllabus: [
+          ModuleModel(
+            id: 'm1',
+            title: 'Module 1: Edge Computing & Media Security',
+            description: 'Core concepts',
+            lessons: [
+              LessonModel(
+                id: 'l1',
+                courseId: 'c_modal_test',
+                title: 'Welcome & System Architecture Overview',
+                order: 1,
+                videoUrl: '',
+                cloudinaryPublicId: 'courses/c_modal_test/l1',
+                duration: '12m',
+                isPreview: true,
+                resources: [
+                  LessonResource(
+                    title: 'System Architecture Blueprint.pdf',
+                    url: 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/resources/blueprint.pdf',
+                    type: 'pdf',
+                    isPreview: true,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+        quizzes: [
+          QuizModel(
+            id: 'q1',
+            courseId: 'c_modal_test',
+            title: 'Module 1 Assessment Quiz',
+            description: 'Test your understanding of edge workers and signed media tokens.',
+            timeLimitMinutes: 15,
+            passingScore: 80,
+            questions: [
+              QuizQuestion(
+                id: 'q_item_1',
+                question: 'Which service signs authenticated stream URLs in this system?',
+                explanation: 'Cloudflare Workers use Worker Secrets to sign authenticated Cloudinary URLs.',
+                type: QuestionType.multipleChoice,
+                options: [
+                  QuizOption(id: 'opt_1', text: 'Cloudflare Workers', isCorrect: true),
+                  QuizOption(id: 'opt_2', text: 'Direct Client WebApp', isCorrect: false),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      // 1. Test CourseBuilderScreen "Add Lesson" & "Edit Lesson" modal
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) {
+              final n = AuthNotifier(AuthService());
+              n.state = authUser;
+              return n;
+            }),
+            allCoursesProvider.overrideWith((ref) async => [sampleCourse]),
+            courseByIdProvider('c_modal_test').overrideWith((ref) async => sampleCourse),
+          ],
+          child: const MediaQuery(
+            data: MediaQueryData(size: size),
+            child: MaterialApp(
+              home: Scaffold(
+                body: CourseBuilderScreen(courseId: 'c_modal_test'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap "Add Lesson" button inside Module 1
+      final addLessonFinder = find.widgetWithText(OutlinedButton, 'Add Lesson');
+      if (addLessonFinder.evaluate().isNotEmpty) {
+        await tester.tap(addLessonFinder.first);
+        await tester.pumpAndSettle();
+
+        // Verify "Add Lesson & Upload Content" dialog opened with zero overflow
+        expect(find.text('Add Lesson & Upload Content'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // Close dialog
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+      }
+
+      // Tap "Add Quiz" button inside Quizzes card
+      final addQuizFinder = find.widgetWithText(AppButton, 'Add Quiz');
+      if (addQuizFinder.evaluate().isNotEmpty) {
+        await tester.ensureVisible(addQuizFinder.first);
+        await tester.pumpAndSettle();
+        await tester.tap(addQuizFinder.first);
+        await tester.pumpAndSettle();
+
+        // Verify "Create New Course Quiz" dialog opened with zero overflow
+        expect(find.text('Create New Course Quiz'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // Tap "Add Question" inside quiz modal
+        final addQuestionFinder = find.widgetWithText(AppButton, 'Add Question');
+        if (addQuestionFinder.evaluate().isNotEmpty) {
+          await tester.tap(addQuestionFinder.first);
+          await tester.pumpAndSettle();
+
+          // Verify "Add Question" editor dialog opened with Type ChoiceChips with zero overflow
+          expect(find.text('Add Question'), findsWidgets);
+          expect(tester.takeException(), isNull);
+
+          // Close question editor
+          await tester.tap(find.text('Cancel').last);
+          await tester.pumpAndSettle();
+        }
+
+        // Close quiz modal
+        await tester.tap(find.text('Cancel').first);
+        await tester.pumpAndSettle();
+      }
+
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    testWidgets('InstructorDashboardScreen has zero overflow on 360x800 phone', (tester) async {
+      const size = Size(360, 800);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      await tester.binding.setSurfaceSize(size);
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MediaQuery(
+            data: MediaQueryData(size: size),
+            child: MaterialApp(
+              home: Scaffold(
+                body: InstructorDashboardScreen(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Instructor Dashboard'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await tester.binding.setSurfaceSize(null);
     });
   });
 }

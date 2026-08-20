@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 import '../firebase_options.dart';
@@ -153,12 +155,33 @@ class AuthService {
     return _localUser;
   }
 
-  /// Sign In with Google (Quick Social Auth)
+  /// Sign In with Google (Cross-platform: Web via signInWithPopup, Android & iOS via GoogleSignIn)
   Future<UserModel?> signInWithGoogle({UserRole role = UserRole.student}) async {
-    if (_isConfiguredWithLiveFirebase && kIsWeb && _firebaseAuth != null && _firestore != null) {
+    if (_isConfiguredWithLiveFirebase && _firebaseAuth != null && _firestore != null) {
       try {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        final userCredential = await _firebaseAuth!.signInWithPopup(googleProvider);
+        UserCredential? userCredential;
+
+        if (kIsWeb) {
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          userCredential = await _firebaseAuth!.signInWithPopup(googleProvider);
+        } else {
+          // Native Android & iOS Google Sign-In
+          final GoogleSignIn googleSignIn = GoogleSignIn(
+            serverClientId: '1078631241013-dbq8s09qapseiq8grgsf83tc2hk7in74.apps.googleusercontent.com',
+          );
+          final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+          if (googleUser == null) {
+            debugPrint('[AuthService] Google sign-in cancelled by user on mobile.');
+            return null;
+          }
+          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+          final OAuthCredential credential = GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          );
+          userCredential = await _firebaseAuth!.signInWithCredential(credential);
+        }
+
         if (userCredential.user != null) {
           final userDoc = await _firestore!.collection('users').doc(userCredential.user!.uid).get();
           if (userDoc.exists && userDoc.data() != null) {
@@ -172,9 +195,9 @@ class AuthService {
               id: userCredential.user!.uid,
               name: userCredential.user!.displayName ?? 'Learner',
               email: userCredential.user!.email ?? 'user@gmail.com',
-              role: UserRole.student, // Forced student on creation
+              role: role,
               photoUrl: userCredential.user!.photoURL ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              bio: 'New EduSphere student.',
+              bio: role == UserRole.instructor ? 'EduSphere verified instructor.' : 'New EduSphere student.',
               xp: 250,
               streak: 1,
               badges: const ['New Joiner'],
@@ -196,7 +219,17 @@ class AuthService {
           }
           rethrow;
         }
-        return null;
+        if (e is PlatformException) {
+          if (e.code == 'sign_in_canceled' || e.code == 'canceled' || e.message?.toLowerCase().contains('cancel') == true) {
+            debugPrint('[AuthService] Google sign-in cancelled by user.');
+            return null;
+          }
+          if (e.message?.contains('ApiException: 10') == true || e.toString().contains('10')) {
+            throw Exception('Google Sign-In Configuration Error (ApiException: 10): SHA-1 fingerprint needs to be added in Firebase Console.');
+          }
+          rethrow;
+        }
+        rethrow;
       }
     }
 
@@ -210,7 +243,7 @@ class AuthService {
       id: 'google_user_01',
       name: 'Google Learner',
       email: 'learner@gmail.com',
-      role: UserRole.student,
+      role: role,
       photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
       bio: 'New EduSphere student.',
       xp: 250,

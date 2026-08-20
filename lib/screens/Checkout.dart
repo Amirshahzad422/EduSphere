@@ -166,8 +166,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
               const SizedBox(height: 12),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     'Checkout',
@@ -179,21 +182,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                   // Stripe Test Mode Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withOpacity(0.12),
                       borderRadius: AppSpacing.roundedFull,
                       border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.lock, size: 14, color: AppColors.secondary),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.lock, size: 13, color: AppColors.secondary),
+                        const SizedBox(width: 5),
                         Text(
                           'Stripe Test Mode Active',
                           style: AppTypography.labelSmall.copyWith(
                             color: AppColors.secondary,
                             fontWeight: FontWeight.w700,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -503,9 +508,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             children: [
               const Icon(Icons.shield_outlined, size: 16, color: AppColors.secondary),
               const SizedBox(width: 6),
-              Text(
-                'Guaranteed Safe & Secure Checkout',
-                style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 11),
+              Flexible(
+                child: Text(
+                  'Guaranteed Safe & Secure Checkout',
+                  style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

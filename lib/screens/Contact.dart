@@ -82,11 +82,15 @@ class _ContactScreenState extends State<ContactScreen> {
                     children: [
                       const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
                       const SizedBox(width: 8),
-                      Text(
-                        'Back to Home',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          'Back to Home',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -115,111 +119,119 @@ class _ContactScreenState extends State<ContactScreen> {
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 750;
 
-                  return Flex(
-                    direction: isWide ? Axis.horizontal : Axis.vertical,
+                  final formWidget = Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppSpacing.roundedLg,
+                      border: Border.all(color: AppColors.surfaceContainerHigh),
+                      boxShadow: const [
+                        BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Send a Message', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: _selectedCategory,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Inquiry Subject'),
+                            items: _categories.map((c) {
+                              return DropdownMenuItem(
+                                value: c,
+                                child: Text(c, overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) setState(() => _selectedCategory = val);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(labelText: 'Your Name *'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your name' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(labelText: 'Email Address *'),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Please enter your email';
+                              if (!v.contains('@') || !v.contains('.')) return 'Please enter a valid email address';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _messageController,
+                            maxLines: 4,
+                            decoration: const InputDecoration(labelText: 'How can we help? *'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your message' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: AppButton(
+                              label: 'Send Message',
+                              variant: ButtonVariant.primary,
+                              icon: Icons.send,
+                              isLoading: _isSending,
+                              onPressed: _handleSubmit,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  const infoWidget = Column(
+                    children: [
+                      _ContactInfoCard(
+                        icon: Icons.email_outlined,
+                        title: 'Direct Support',
+                        detail: 'support@edusphere.io',
+                        subtext: 'Average response under 2 hours',
+                      ),
+                      SizedBox(height: 14),
+                      _ContactInfoCard(
+                        icon: Icons.schedule_outlined,
+                        title: 'Operational Hours',
+                        detail: 'Mon – Fri: 9:00 AM – 6:00 PM UTC',
+                        subtext: '24/7 automated ledger verification',
+                      ),
+                      SizedBox(height: 14),
+                      _ContactInfoCard(
+                        icon: Icons.location_on_outlined,
+                        title: 'Global Headquarters',
+                        detail: 'EduSphere Learning Technologies',
+                        subtext: 'San Francisco, CA & London, UK',
+                      ),
+                    ],
+                  );
+
+                  if (isWide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: formWidget),
+                        const SizedBox(width: 24),
+                        const Expanded(flex: 4, child: infoWidget),
+                      ],
+                    );
+                  }
+
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Form Column
-                      Expanded(
-                        flex: isWide ? 6 : 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: AppSpacing.roundedLg,
-                            border: Border.all(color: AppColors.surfaceContainerHigh),
-                            boxShadow: const [
-                              BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: Offset(0, 4)),
-                            ],
-                          ),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Send a Message', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800)),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<String>(
-                                  value: _selectedCategory,
-                                  decoration: const InputDecoration(labelText: 'Inquiry Subject'),
-                                  items: _categories.map((c) {
-                                    return DropdownMenuItem(value: c, child: Text(c));
-                                  }).toList(),
-                                  onChanged: (val) {
-                                    if (val != null) setState(() => _selectedCategory = val);
-                                  },
-                                ),
-                                const SizedBox(height: 14),
-                                TextFormField(
-                                  controller: _nameController,
-                                  decoration: const InputDecoration(labelText: 'Your Name *'),
-                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your name' : null,
-                                ),
-                                const SizedBox(height: 14),
-                                TextFormField(
-                                  controller: _emailController,
-                                  decoration: const InputDecoration(labelText: 'Email Address *'),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) return 'Please enter your email';
-                                    if (!v.contains('@') || !v.contains('.')) return 'Please enter a valid email address';
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 14),
-                                TextFormField(
-                                  controller: _messageController,
-                                  maxLines: 4,
-                                  decoration: const InputDecoration(labelText: 'How can we help? *'),
-                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your message' : null,
-                                ),
-                                const SizedBox(height: 20),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: AppButton(
-                                    label: 'Send Message',
-                                    variant: ButtonVariant.primary,
-                                    icon: Icons.send,
-                                    isLoading: _isSending,
-                                    onPressed: _handleSubmit,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      if (isWide) const SizedBox(width: 24) else const SizedBox(height: 24),
-
-                      // Info Column
-                      Expanded(
-                        flex: isWide ? 4 : 0,
-                        child: Column(
-                          children: const [
-                            _ContactInfoCard(
-                              icon: Icons.email_outlined,
-                              title: 'Direct Support',
-                              detail: 'support@edusphere.io',
-                              subtext: 'Average response under 2 hours',
-                            ),
-                            SizedBox(height: 14),
-                            _ContactInfoCard(
-                              icon: Icons.schedule_outlined,
-                              title: 'Operational Hours',
-                              detail: 'Mon – Fri: 9:00 AM – 6:00 PM UTC',
-                              subtext: '24/7 automated ledger verification',
-                            ),
-                            SizedBox(height: 14),
-                            _ContactInfoCard(
-                              icon: Icons.location_on_outlined,
-                              title: 'Global Headquarters',
-                              detail: 'EduSphere Learning Technologies',
-                              subtext: 'San Francisco, CA & London, UK',
-                            ),
-                          ],
-                        ),
-                      ),
+                      formWidget,
+                      const SizedBox(height: 24),
+                      infoWidget,
                     ],
                   );
                 },

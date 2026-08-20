@@ -109,93 +109,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = AppHelpers.isDesktop(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompact = screenWidth < 400;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 16.0 : 24.0, vertical: isCompact ? 16.0 : 32.0),
             child: Container(
               constraints: BoxConstraints(maxWidth: isDesktop ? 1080 : 480),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Left Hero Banner (Desktop Only matching /stitch/edusphere_register/)
-                  if (isDesktop)
-                    Expanded(
-                      flex: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 64.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: AppSpacing.roundedMd,
-                              ),
-                              child: const Icon(Icons.auto_stories, size: 32, color: Colors.white),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Join EduSphere',
-                              style: AppTypography.displayLarge.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                                letterSpacing: -1.0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Begin your journey towards career progression and deep knowledge. A structured, architectural learning experience awaits.',
-                              style: AppTypography.bodyLarge.copyWith(
-                                color: AppColors.onSurfaceVariant,
-                                height: 1.6,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            ClipRRect(
-                              borderRadius: AppSpacing.roundedXl,
-                              child: AspectRatio(
-                                aspectRatio: 4 / 3,
-                                child: Image.network(
-                                  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: AppColors.surfaceContainerHigh,
-                                    child: const Center(
-                                      child: Icon(Icons.school, size: 64, color: AppColors.outline),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+              width: double.infinity,
+              child: Builder(
+                builder: (context) {
+                  final formCard = Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(isCompact ? 20.0 : 32.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppSpacing.roundedXl,
+                      border: Border.all(color: AppColors.surfaceContainerHigh),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppColors.cardShadow,
+                          blurRadius: 16,
+                          offset: Offset(0, 4),
                         ),
-                      ),
+                      ],
                     ),
-
-                  // Right Registration Card
-                  Expanded(
-                    flex: isDesktop ? 5 : 1,
-                    child: Container(
-                      padding: const EdgeInsets.all(32.0),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLowest,
-                        borderRadius: AppSpacing.roundedXl,
-                        border: Border.all(color: AppColors.surfaceContainerHigh),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.cardShadow,
-                            blurRadius: 16,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -253,40 +195,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                // Student Card
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => setState(() => _selectedRole = UserRole.student),
-                                    borderRadius: AppSpacing.roundedMd,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                                      decoration: BoxDecoration(
+                            LayoutBuilder(
+                              builder: (context, roleConstraints) {
+                                final isRoleCompact = roleConstraints.maxWidth < 320;
+
+                                final studentCard = InkWell(
+                                  onTap: () => setState(() => _selectedRole = UserRole.student),
+                                  borderRadius: AppSpacing.roundedMd,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedRole == UserRole.student
+                                          ? AppColors.secondaryFixedDim.withOpacity(0.18)
+                                          : AppColors.surfaceContainerLowest,
+                                      borderRadius: AppSpacing.roundedMd,
+                                      border: Border.all(
                                         color: _selectedRole == UserRole.student
-                                            ? AppColors.secondaryFixedDim.withOpacity(0.18)
-                                            : AppColors.surfaceContainerLowest,
-                                        borderRadius: AppSpacing.roundedMd,
-                                        border: Border.all(
+                                            ? AppColors.secondary
+                                            : AppColors.outlineVariant,
+                                        width: _selectedRole == UserRole.student ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.school,
+                                          size: 18,
                                           color: _selectedRole == UserRole.student
                                               ? AppColors.secondary
-                                              : AppColors.outlineVariant,
-                                          width: _selectedRole == UserRole.student ? 2 : 1,
+                                              : AppColors.outline,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.school,
-                                            size: 20,
-                                            color: _selectedRole == UserRole.student
-                                                ? AppColors.secondary
-                                                : AppColors.outline,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
                                             'Student',
                                             style: AppTypography.labelLarge.copyWith(
                                               color: _selectedRole == UserRole.student
@@ -294,45 +237,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                                   : AppColors.onSurface,
                                               fontWeight: FontWeight.w700,
                                             ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                // Instructor Card
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => setState(() => _selectedRole = UserRole.instructor),
-                                    borderRadius: AppSpacing.roundedMd,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                                      decoration: BoxDecoration(
+                                );
+
+                                final instructorCard = InkWell(
+                                  onTap: () => setState(() => _selectedRole = UserRole.instructor),
+                                  borderRadius: AppSpacing.roundedMd,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedRole == UserRole.instructor
+                                          ? AppColors.secondaryFixedDim.withOpacity(0.18)
+                                          : AppColors.surfaceContainerLowest,
+                                      borderRadius: AppSpacing.roundedMd,
+                                      border: Border.all(
                                         color: _selectedRole == UserRole.instructor
-                                            ? AppColors.secondaryFixedDim.withOpacity(0.18)
-                                            : AppColors.surfaceContainerLowest,
-                                        borderRadius: AppSpacing.roundedMd,
-                                        border: Border.all(
+                                            ? AppColors.secondary
+                                            : AppColors.outlineVariant,
+                                        width: _selectedRole == UserRole.instructor ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.co_present,
+                                          size: 18,
                                           color: _selectedRole == UserRole.instructor
                                               ? AppColors.secondary
-                                              : AppColors.outlineVariant,
-                                          width: _selectedRole == UserRole.instructor ? 2 : 1,
+                                              : AppColors.outline,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.co_present,
-                                            size: 20,
-                                            color: _selectedRole == UserRole.instructor
-                                                ? AppColors.secondary
-                                                : AppColors.outline,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
                                             'Instructor',
                                             style: AppTypography.labelLarge.copyWith(
                                               color: _selectedRole == UserRole.instructor
@@ -340,13 +284,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                                   : AppColors.onSurface,
                                               fontWeight: FontWeight.w700,
                                             ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                              ],
+                                );
+
+                                if (isRoleCompact) {
+                                  return Column(
+                                    children: [
+                                      studentCard,
+                                      const SizedBox(height: 10),
+                                      instructorCard,
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(child: studentCard),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: instructorCard),
+                                  ],
+                                );
+                              },
                             ),
                             const SizedBox(height: 20),
 
@@ -558,11 +522,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        Text(
-                                          'Sign Up with Google',
-                                          style: AppTypography.labelLarge.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.onSurface,
+                                        Flexible(
+                                          child: Text(
+                                            'Sign Up with Google',
+                                            style: AppTypography.labelLarge.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.onSurface,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -571,14 +539,78 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    );
+
+                    if (isDesktop) {
+                      final heroBanner = Padding(
+                        padding: const EdgeInsets.only(right: 64.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: AppSpacing.roundedMd,
+                              ),
+                              child: const Icon(Icons.auto_stories, size: 32, color: Colors.white),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Join EduSphere',
+                              style: AppTypography.displayLarge.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                                letterSpacing: -1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Begin your journey towards career progression and deep knowledge. A structured, architectural learning experience awaits.',
+                              style: AppTypography.bodyLarge.copyWith(
+                                color: AppColors.onSurfaceVariant,
+                                height: 1.6,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            ClipRRect(
+                              borderRadius: AppSpacing.roundedXl,
+                              child: AspectRatio(
+                                aspectRatio: 4 / 3,
+                                child: Image.network(
+                                  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: AppColors.surfaceContainerHigh,
+                                    child: const Center(
+                                      child: Icon(Icons.school, size: 64, color: AppColors.outline),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(flex: 6, child: heroBanner),
+                          Expanded(flex: 5, child: formCard),
+                        ],
+                      );
+                    }
+
+                    return formCard;
+                  },
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
-}

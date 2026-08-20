@@ -286,17 +286,23 @@ class InstructorDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 32),
 
                       // My Published Courses List
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Text(
                             'My Published Courses (${myCourses.length})',
-                            style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+                            style: AppTypography.headlineSmall.copyWith(
+                              fontWeight: FontWeight.w800,
+                              fontSize: isDesktop ? 24 : 18,
+                            ),
                           ),
                           if (myCourses.isNotEmpty)
                             TextButton.icon(
                               icon: const Icon(Icons.add, size: 16),
-                              label: const Text('Add Course'),
+                              label: const Text('+ Add Course'),
                               onPressed: () => context.go('/builder'),
                             ),
                         ],
@@ -362,57 +368,74 @@ class InstructorDashboardScreen extends ConsumerWidget {
                             separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                             itemBuilder: (context, index) {
                               final course = myCourses[index];
-                              return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                leading: ClipRRect(
-                                  borderRadius: AppSpacing.roundedSm,
-                                  child: SizedBox(
-                                    width: 64,
-                                    height: 44,
-                                    child: AppHelpers.buildCachedImage(
-                                      imageUrl: course.thumbnailUrl,
-                                      width: 64,
-                                      height: 44,
-                                      fit: BoxFit.cover,
-                                      memCacheWidth: 150,
-                                    ),
-                                  ),
-                                ),
-                                title: Text(
-                                  course.title,
-                                  style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  '${course.category} • ${AppFormatters.formatCount(course.enrolmentCount)} students • ${course.rating.toStringAsFixed(1)} ★ (${course.reviewCount}) • ${AppFormatters.formatCurrency(course.effectivePrice)}${course.discount > 0 ? ' (${course.discount.round()}% OFF)' : ''} • Earned: ${AppFormatters.formatCurrency(course.instructorRevenue)}',
-                                  style: AppTypography.bodySmall,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                child: Row(
                                   children: [
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
-                                      tooltip: 'Edit in Builder',
-                                      onPressed: () => context.go('/builder?courseId=${course.id}'),
+                                    ClipRRect(
+                                      borderRadius: AppSpacing.roundedSm,
+                                      child: SizedBox(
+                                        width: 56,
+                                        height: 40,
+                                        child: AppHelpers.buildCachedImage(
+                                          imageUrl: course.thumbnailUrl,
+                                          width: 56,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: 150,
+                                        ),
+                                      ),
                                     ),
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.outline),
-                                      tooltip: 'View Course Page',
-                                      onPressed: () => context.go('/course/${course.id}'),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            course.title,
+                                            style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${course.category} • ${AppFormatters.formatCount(course.enrolmentCount)} stds • ${AppFormatters.formatCurrency(course.effectivePrice)} • Earned: ${AppFormatters.formatCurrency(course.instructorRevenue)}',
+                                            style: AppTypography.bodySmall.copyWith(
+                                              color: AppColors.onSurfaceVariant,
+                                              fontSize: 11,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                                      tooltip: 'Delete Course Permanently',
-                                      onPressed: () => _showDeleteCourseDialog(context, ref, course, user?.id),
+                                    const SizedBox(width: 4),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                          icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
+                                          tooltip: 'Edit in Builder',
+                                          onPressed: () => context.go('/builder?courseId=${course.id}'),
+                                        ),
+                                        IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                          icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.outline),
+                                          tooltip: 'View Course Page',
+                                          onPressed: () => context.go('/course/${course.id}'),
+                                        ),
+                                        IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                          icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                          tooltip: 'Delete Course Permanently',
+                                          onPressed: () => _showDeleteCourseDialog(context, ref, course, user?.id),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

@@ -259,7 +259,7 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                         children: [
                           if (isNativeSupported)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.7),
                                 borderRadius: AppSpacing.roundedSm,
@@ -268,13 +268,13 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.verified_user, size: 12, color: AppColors.secondary),
-                                  const SizedBox(width: 4),
+                                  const Icon(Icons.verified_user, size: 11, color: AppColors.secondary),
+                                  const SizedBox(width: 3),
                                   Text(
-                                    'EduSphere WebRTC',
+                                    MediaQuery.sizeOf(context).width > 420 ? 'EduSphere WebRTC' : 'WebRTC',
                                     style: AppTypography.labelSmall.copyWith(
                                       color: Colors.white,
-                                      fontSize: 10,
+                                      fontSize: 9.5,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),

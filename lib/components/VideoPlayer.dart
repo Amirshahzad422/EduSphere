@@ -551,41 +551,45 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                         children: [
                           IconButton(
                             icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                            iconSize: 22,
+                            iconSize: 20,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: _togglePlayPause,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '$currentTimeStr / $totalTimeStr',
-                            style: AppTypography.labelSmall.copyWith(color: Colors.white70),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '$currentTimeStr / $totalTimeStr',
+                              style: AppTypography.labelSmall.copyWith(color: Colors.white70, fontSize: 10),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 4),
                           // Speed Button
                           InkWell(
                             onTap: _cyclePlaybackSpeed,
                             borderRadius: AppSpacing.roundedSm,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
                                 color: Colors.white12,
                                 borderRadius: AppSpacing.roundedSm,
                               ),
                               child: Text(
                                 '${_playbackSpeed}x',
-                                style: AppTypography.labelSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                                style: AppTypography.labelSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           // Subtitles Button
                           IconButton(
                             tooltip: 'Toggle Subtitles',
                             icon: Icon(
                               _subtitlesEnabled ? Icons.closed_caption : Icons.closed_caption_outlined,
                               color: _subtitlesEnabled ? AppColors.secondary : Colors.white70,
-                              size: 20,
+                              size: 18,
                             ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -594,13 +598,13 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                               _showControlsTemporarily();
                             },
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           // Fullscreen
                           IconButton(
                             icon: Icon(
                               _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
                               color: Colors.white70,
-                              size: 22,
+                              size: 20,
                             ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),

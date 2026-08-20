@@ -7,6 +7,60 @@ All notable changes to the EduSphere project will be documented in this file.
 ## [Phase 6 Update & Production Polish] - Sections 1, 2, 3 & 4
 
 ### Added & Refactored
+- **Section 20: Cross-Platform Native Android & iOS Google Sign-In Integration**:
+  - **Native Google Sign-In Support ([`pubspec.yaml`](file:///d:/Edusphere/pubspec.yaml), [`lib/services/auth_service.dart`](file:///d:/Edusphere/lib/services/auth_service.dart))**:
+    - Installed official `google_sign_in: ^6.2.2` Flutter plugin.
+    - Updated `signInWithGoogle` to execute cross-platform:
+      - **Web (`kIsWeb`)**: Uses `FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider())`.
+      - **Mobile (Android & iOS)**: Uses `GoogleSignIn(serverClientId: ...)` native account bottom-sheet chooser, exchanges OAuth tokens for Firebase credentials via `GoogleAuthProvider.credential()`, and signs into Firebase Auth with `signInWithCredential()`.
+    - Resolved the issue where Google Sign-In was previously locked to `kIsWeb` only and returning null silently on Android devices.
+    - Preserved automatic Firestore profile provisioning (`users/{uid}` and `publicProfiles/{uid}`), daily streak tracking, and role propagation for both Student and Instructor logins.
+
+- **Section 19: Silky-Smooth Fast Screen Navigation & Zero-Ghosting Transitions**:
+  - **Replaced Flawed Fade-Slide Overlay ([`lib/routes/app_router.dart`](file:///d:/Edusphere/lib/routes/app_router.dart))**:
+    - Eliminated transparency bleed where semi-transparent incoming screens were superimposing directly on top of previous screens for ~120ms during navigation.
+    - Implemented **`_buildTabTransitionPage` (`NoTransitionPage`)** for primary root shell tabs (`/home`, `/courses`, `/my-learning`, `/wishlist`, `/profile`, `/instructor`), delivering instant, native-speed, crisp tab switching with zero delay and zero visual ghosting.
+    - Implemented **`_buildSmoothSlidePage`** for detail and action screens (`/course/:id`, `/lesson/...`, `/quiz/...`, `/live-class/...`, `/builder`, `/earnings`, `/cart`, `/checkout`, `/about`, `/contact`, `/login`, etc.) wrapped in an opaque `Material(color: AppColors.background)` surface with a 200ms `Curves.fastEaseInToSlowEaseOut` horizontal slide.
+    - Guaranteed 100% opaque surface compositing so screens never bleed through or double-render during transitions.
+
+- **Section 18: Interactive Modal & Dashboard Overflow Elimination**:
+  - **Official Verified Credential Modals ([`lib/screens/Certificates.dart`](file:///d:/Edusphere/lib/screens/Certificates.dart))**:
+    - Wrapped verification dialog title in `Expanded(child: Text(..., overflow: TextOverflow.ellipsis))` preventing right overflow when verifying certificate IDs.
+    - Wrapped certificate preview modal top badge in `Flexible` and certificate parchment in `LayoutBuilder` with adaptive padding (`14px` on mobile vs `28px` on desktop) and flexible gold divider gradient bars (`maxWidth: 80`).
+  - **Course Builder "Add Lesson" & "Edit Lesson" Modals ([`lib/screens/CourseBuilder.dart`](file:///d:/Edusphere/lib/screens/CourseBuilder.dart))**:
+    - Wrapped `_showLessonDialog` dialog title row in `Expanded(child: Text(..., overflow: TextOverflow.ellipsis))` resolving the overflow for both "Edit Lesson & Content" and "Add Lesson & Upload Content".
+    - Wrapped video upload card title in `Expanded` and converted top save/publish actions in edit mode to responsive `Wrap`.
+  - **Quiz Question Editor & Quiz Assessment Runner ([`lib/screens/CourseBuilder.dart`](file:///d:/Edusphere/lib/screens/CourseBuilder.dart) & [`lib/components/QuizWidget.dart`](file:///d:/Edusphere/lib/components/QuizWidget.dart))**:
+    - Replaced question type selector `Row` in `_showQuestionEditorDialog` with `Wrap(spacing: 8, runSpacing: 8)` allowing MCQ / True-False / Short Answer choice chips to wrap cleanly onto multiple lines on small viewports.
+    - Wrapped quiz options preview chips in `Flexible(child: Text(..., overflow: TextOverflow.ellipsis))` and question titles in `Expanded`.
+    - Made `QuizWidget.dart` bottom navigation row responsive with `Wrap(alignment: WrapAlignment.spaceBetween)` so Previous / Next / Submit buttons never clip.
+  - **Instructor Dashboard "My Published Courses" + "+ Add Course" ([`lib/screens/InstructorDashboard.dart`](file:///d:/Edusphere/lib/screens/InstructorDashboard.dart))**:
+    - Replaced published courses header row with `Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center)` so title and "+ Add Course" wrap gracefully.
+    - Made each published course list item layout responsive with flexible text and compact touch targets.
+
+- **Section 17: Full Systematic Responsive Pass Across Mobile, Tablet & Desktop (Zero Overflow Guarantee)**:
+  - **Comprehensive Multi-Breakpoint Test Automation ([`test/widget_test.dart`](file:///d:/Edusphere/test/widget_test.dart))**:
+    - Built an automated multi-device sweep validating all 22 screens across `360 x 800` (compact phone), `414 x 896` (large phone), `768 x 1024` (tablet), and `1280 x 800` (desktop).
+    - Configured realistic `tester.view.physicalSize` and `MediaQueryData` to catch layout/flex bugs on extreme viewports.
+  - **Screen-by-Screen Layout Refactorings & Overflow Fixes**:
+    - **[`Home.dart`](file:///d:/Edusphere/lib/screens/Home.dart)**: Wrapped outer scroll child in `SizedBox(width: double.infinity)` to prevent flex shrink-wrap, made header greeting responsive with `Wrap`, converted "Why Choose Us" feature list to adaptive column cards on mobile, and made Featured Courses section header flexible.
+    - **[`CourseCard.dart`](file:///d:/Edusphere/lib/components/CourseCard.dart)**: Wrapped metadata tags in `Flexible` and fitted price row with `FittedBox`, accommodating grid aspect ratios down to 0.60 without clipping.
+    - **[`CourseDetails.dart`](file:///d:/Edusphere/lib/screens/CourseDetails.dart)**: Added `Flexible` breadcrumb back-navigation, converted curriculum module header to responsive `Wrap`, and wrapped review authors in `Expanded` columns.
+    - **[`VideoPlayer.dart`](file:///d:/Edusphere/lib/components/VideoPlayer.dart)**: Made bottom playback controls row responsive with flexible time counter and compact touch targets, eliminating player control bar overflow on narrow mobile screens.
+    - **[`Lesson.dart`](file:///d:/Edusphere/lib/screens/Lesson.dart)**: Wrapped "Previous" and "Next Lesson" navigation buttons in `Expanded` to fit side-by-side on any viewport.
+    - **[`LiveClass.dart`](file:///d:/Edusphere/lib/screens/LiveClass.dart) & [`LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart)**: Protected cleanup in `dispose()` by safely caching dependencies in `didChangeDependencies()`, and constrained header badges.
+    - **[`QuizWidget.dart`](file:///d:/Edusphere/lib/components/QuizWidget.dart)**: Wrapped quiz question counter header in `Expanded` to prevent right overflow on compact screens.
+    - **[`MyLearning.dart`](file:///d:/Edusphere/lib/screens/MyLearning.dart)**: Wrapped live class hero banner in `LayoutBuilder` for responsive image/content stacking.
+    - **[`Certificates.dart`](file:///d:/Edusphere/lib/screens/Certificates.dart)**: Made public verification ID input card adaptive with `LayoutBuilder`, stacking action buttons cleanly on narrow phones.
+    - **[`Cart.dart`](file:///d:/Edusphere/lib/screens/Cart.dart) & [`Checkout.dart`](file:///d:/Edusphere/lib/screens/Checkout.dart)**: Wrapped discount coupon tags in `Expanded` with ellipsis, replaced header rows with `Wrap`, and made checkout security statement flexible.
+    - **[`Profile.dart`](file:///d:/Edusphere/lib/screens/Profile.dart)**: Wrapped earned badges header in `Expanded` to eliminate text collision against the "View All Awards" button.
+    - **[`InstructorDashboard.dart`](file:///d:/Edusphere/lib/screens/InstructorDashboard.dart)**: Made published courses header flexible with `Expanded` text.
+    - **[`CourseBuilder.dart`](file:///d:/Edusphere/lib/screens/CourseBuilder.dart)**: Replaced rigid module header action rows with adaptive `Wrap`, constrained module titles, made quiz header and lesson resource tags overflow-safe.
+    - **[`Earnings.dart`](file:///d:/Edusphere/lib/screens/Earnings.dart)**: Made back breadcrumb text flexible with `Flexible(child: Text(..., overflow: TextOverflow.ellipsis))`.
+    - **[`About.dart`](file:///d:/Edusphere/lib/screens/About.dart)**: Converted Architectural Pillars grid to vertical card column on mobile, unwrapped FAQ header from rigid row, and made mission card header flexible.
+    - **[`Contact.dart`](file:///d:/Edusphere/lib/screens/Contact.dart)**: Added `isExpanded: true` and text ellipsis to `DropdownButtonFormField`, preventing long inquiry category strings from overflowing.
+    - **[`NotFound.dart`](file:///d:/Edusphere/lib/screens/NotFound.dart)**: Made recovery action buttons stack vertically below 360px.
+    - **[`Login.dart`](file:///d:/Edusphere/lib/screens/Login.dart) & [`Register.dart`](file:///d:/Edusphere/lib/screens/Register.dart)**: Added adaptive horizontal padding (16px mobile vs 24px desktop) and flexible Google sign-in buttons.
 - **Section 16: Payment Success Receipt Overflow, Lesson Notes Overflow & Course Completion Certificate Sync**:
   - **Payment Success Screen Receipt Overflow Polish ([`Checkout.dart`](file:///d:/Edusphere/lib/screens/Checkout.dart))**:
     - Replaced rigid `_receiptRow` with `Flexible(child: Text(..., overflow: TextOverflow.ellipsis, maxLines: 2))` and top-aligned rows, completely preventing horizontal overflow on lengthy Stripe payment receipt tokens (`pi_...`).

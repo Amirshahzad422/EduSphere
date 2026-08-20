@@ -121,7 +121,7 @@ class CourseCard extends StatelessWidget {
 
             // Course Details
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -129,17 +129,18 @@ class CourseCard extends StatelessWidget {
                   Row(
                     children: [
                       CircleAvatar(
-                        radius: 10,
+                        radius: 9,
                         backgroundImage: NetworkImage(course.instructor.avatarUrl),
                         backgroundColor: AppColors.surfaceContainerHigh,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           course.instructor.name,
                           style: AppTypography.bodySmall.copyWith(
                             fontWeight: FontWeight.w500,
                             color: AppColors.onSurfaceVariant,
+                            fontSize: 11,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -147,7 +148,7 @@ class CourseCard extends StatelessWidget {
                       ),
                       // Level Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerHigh,
                           borderRadius: AppSpacing.roundedSm,
@@ -155,7 +156,7 @@ class CourseCard extends StatelessWidget {
                         child: Text(
                           course.level,
                           style: AppTypography.labelSmall.copyWith(
-                            fontSize: 10,
+                            fontSize: 9,
                             color: AppColors.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                           ),
@@ -163,81 +164,95 @@ class CourseCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // Title
                   Text(
                     course.title,
-                    style: AppTypography.titleMedium.copyWith(
+                    style: AppTypography.titleSmall.copyWith(
                       fontWeight: FontWeight.w700,
-                      height: 1.25,
+                      height: 1.2,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // Metadata Row: Rating, Enrolments, Duration
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
-                      const SizedBox(width: 3),
+                      const Icon(Icons.star_rounded, size: 15, color: AppColors.star),
+                      const SizedBox(width: 2),
                       Text(
                         course.rating.toStringAsFixed(1),
                         style: AppTypography.labelSmall.copyWith(
                           fontWeight: FontWeight.w700,
                           color: AppColors.onSurface,
+                          fontSize: 11,
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        '(${AppFormatters.formatCount(course.enrolmentCount)})',
-                        style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.outline),
+                      Flexible(
+                        child: Text(
+                          '(${AppFormatters.formatCount(course.enrolmentCount)})',
+                          style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.outline),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const Spacer(),
-                      const Icon(Icons.schedule, size: 13, color: AppColors.outline),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.schedule, size: 12, color: AppColors.outline),
+                      const SizedBox(width: 2),
                       Text(
                         course.duration,
-                        style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.outline),
+                        style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.outline),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
 
                   // Divider
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
 
                   // Price & View Details Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (course.originalPrice != null)
-                            Text(
-                              AppFormatters.formatCurrency(course.originalPrice!),
-                              style: AppTypography.bodySmall.copyWith(
-                                decoration: TextDecoration.lineThrough,
-                                color: AppColors.outline,
-                                fontSize: 11,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (course.originalPrice != null)
+                              Text(
+                                AppFormatters.formatCurrency(course.originalPrice!),
+                                style: AppTypography.bodySmall.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: AppColors.outline,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                course.price == 0 ? 'Free' : AppFormatters.formatCurrency(course.price),
+                                style: AppTypography.titleLarge.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.secondary,
+                                ),
                               ),
                             ),
-                          Text(
-                            course.price == 0 ? 'Free' : AppFormatters.formatCurrency(course.price),
-                            style: AppTypography.titleLarge.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 6),
                       TextButton(
                         onPressed: onTap,
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           backgroundColor: AppColors.surfaceContainerLow,
                           shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
                         ),

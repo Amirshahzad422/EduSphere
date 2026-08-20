@@ -15,6 +15,7 @@ import '../components/ChatBubble.dart';
 import '../components/Button.dart';
 import '../components/Loader.dart';
 import '../components/jitsi_embed.dart';
+import '../services/live_class_service.dart';
 import '../services/notification_service.dart';
 import '../utils/helpers.dart';
 import '../utils/auth_gate.dart';
@@ -44,6 +45,9 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
   bool _hasJoined = false;
   bool _hasShownEndedDialog = false;
 
+  String? _cachedUserId;
+  LiveClassService? _cachedLiveClassService;
+
   @override
   void initState() {
     super.initState();
@@ -53,12 +57,23 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final user = ref.read(authProvider);
+      _cachedUserId = user?.id;
+      _cachedLiveClassService = ref.read(liveClassServiceProvider);
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _chatController.dispose();
     stopHardwareMediaStream();
-    final user = ref.read(authProvider);
-    if (user != null) {
-      ref.read(liveClassServiceProvider).leaveLiveClass(widget.classId, user.id);
+    if (_cachedUserId != null && _cachedLiveClassService != null) {
+      try {
+        _cachedLiveClassService!.leaveLiveClass(widget.classId, _cachedUserId!);
+      } catch (_) {}
     }
     super.dispose();
   }

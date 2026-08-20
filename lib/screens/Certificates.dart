@@ -96,11 +96,15 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
               size: 28,
             ),
             const SizedBox(width: 10),
-            Text(
-              isValid ? 'Verified Credential' : 'Verification Failed',
-              style: AppTypography.titleLarge.copyWith(
-                color: isValid ? AppColors.secondary : AppColors.error,
-                fontWeight: FontWeight.w800,
+            Expanded(
+              child: Text(
+                isValid ? 'Verified Credential' : 'Verification Failed',
+                style: AppTypography.titleLarge.copyWith(
+                  color: isValid ? AppColors.secondary : AppColors.error,
+                  fontWeight: FontWeight.w800,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -221,23 +225,29 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0x2010B981),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF10B981)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified, size: 14, color: Color(0xFF10B981)),
-                          SizedBox(width: 6),
-                          Text(
-                            'OFFICIALLY VERIFIED CREDENTIAL',
-                            style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0x2010B981),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF10B981)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified, size: 14, color: Color(0xFF10B981)),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'OFFICIALLY VERIFIED CREDENTIAL',
+                                style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     IconButton(
@@ -249,15 +259,21 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                 const SizedBox(height: 10),
 
                 // Main Certificate Parchment
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 10),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+                LayoutBuilder(
+                  builder: (context, parchmentConstraints) {
+                    final isParchmentNarrow = parchmentConstraints.maxWidth < 450;
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 10),
+                        ],
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isParchmentNarrow ? 14 : 28,
+                        vertical: isParchmentNarrow ? 18 : 24,
+                      ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -355,28 +371,32 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 80,
-                            height: 1.5,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.transparent, Color(0xFFD4AF37)],
+                          Flexible(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 80),
+                              height: 1.5,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.transparent, Color(0xFFD4AF37)],
+                                ),
                               ),
                             ),
                           ),
                           const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            padding: EdgeInsets.symmetric(horizontal: 6.0),
                             child: Text(
                               '✦ ❖ ✦',
-                              style: TextStyle(color: Color(0xFFD4AF37), fontSize: 11),
+                              style: TextStyle(color: Color(0xFFD4AF37), fontSize: 10),
                             ),
                           ),
-                          Container(
-                            width: 80,
-                            height: 1.5,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFFD4AF37), Colors.transparent],
+                          Flexible(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 80),
+                              height: 1.5,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFFD4AF37), Colors.transparent],
+                                ),
                               ),
                             ),
                           ),
@@ -520,40 +540,58 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                       ),
                     ],
                   ),
-                ),
+                );
+              },
+            ),
                 const SizedBox(height: 20),
 
                 // Modal Actions
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        label: 'Download / Print PDF',
-                        icon: Icons.print,
-                        variant: ButtonVariant.primary,
-                        onPressed: () => _handleDownloadPdf(cert),
+                LayoutBuilder(
+                  builder: (context, actionConstraints) {
+                    final isCompact = actionConstraints.maxWidth < 450;
+                    final downloadBtn = AppButton(
+                      label: 'Download / Print PDF',
+                      icon: Icons.print,
+                      variant: ButtonVariant.primary,
+                      isFullWidth: isCompact,
+                      onPressed: () => _handleDownloadPdf(cert),
+                    );
+
+                    final copyBtn = OutlinedButton.icon(
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Copy Verification Link'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white38),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.link, size: 18),
-                        label: const Text('Copy Verification Link'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white38),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
-                        ),
-                        onPressed: () {
-                          final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
-                          Clipboard.setData(ClipboardData(text: url));
-                          Navigator.pop(ctx);
-                          AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
-                        },
-                      ),
-                    ),
-                  ],
+                      onPressed: () {
+                        final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
+                        Clipboard.setData(ClipboardData(text: url));
+                        Navigator.pop(ctx);
+                        AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
+                      },
+                    );
+
+                    if (isCompact) {
+                      return Column(
+                        children: [
+                          downloadBtn,
+                          const SizedBox(height: 10),
+                          SizedBox(width: double.infinity, child: copyBtn),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: downloadBtn),
+                        const SizedBox(width: 12),
+                        Expanded(child: copyBtn),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -698,9 +736,13 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                       children: [
                         const Icon(Icons.verified_user, color: AppColors.secondary, size: 22),
                         const SizedBox(width: 8),
-                        Text(
-                          'Verify Any Certificate',
-                          style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                        Flexible(
+                          child: Text(
+                            'Verify Any Certificate',
+                            style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -710,32 +752,65 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                       style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _verifyController,
-                            decoration: InputDecoration(
-                              hintText: 'Enter Verification ID...',
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: AppSpacing.roundedMd,
-                                borderSide: const BorderSide(color: AppColors.outlineVariant),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 420;
+                        if (isCompact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextField(
+                                controller: _verifyController,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter Verification ID...',
+                                  prefixIcon: const Icon(Icons.search, size: 20),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: AppSpacing.roundedMd,
+                                    borderSide: const BorderSide(color: AppColors.outlineVariant),
+                                  ),
+                                ),
+                                onSubmitted: _handleVerifyId,
+                              ),
+                              const SizedBox(height: 10),
+                              AppButton(
+                                label: _isVerifying ? 'Verifying...' : 'Verify Authenticity',
+                                icon: Icons.check_circle_outline,
+                                variant: ButtonVariant.secondary,
+                                isFullWidth: true,
+                                onPressed: _isVerifying ? null : () => _handleVerifyId(_verifyController.text),
+                              ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _verifyController,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter Verification ID...',
+                                  prefixIcon: const Icon(Icons.search, size: 20),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: AppSpacing.roundedMd,
+                                    borderSide: const BorderSide(color: AppColors.outlineVariant),
+                                  ),
+                                ),
+                                onSubmitted: _handleVerifyId,
                               ),
                             ),
-                            onSubmitted: _handleVerifyId,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        AppButton(
-                          label: _isVerifying ? 'Verifying...' : 'Verify',
-                          icon: Icons.check_circle_outline,
-                          variant: ButtonVariant.secondary,
-                          size: ButtonSize.md,
-                          onPressed: _isVerifying ? null : () => _handleVerifyId(_verifyController.text),
-                        ),
-                      ],
+                            const SizedBox(width: 12),
+                            AppButton(
+                              label: _isVerifying ? 'Verifying...' : 'Verify',
+                              icon: Icons.check_circle_outline,
+                              variant: ButtonVariant.secondary,
+                              size: ButtonSize.md,
+                              onPressed: _isVerifying ? null : () => _handleVerifyId(_verifyController.text),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

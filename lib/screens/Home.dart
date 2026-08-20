@@ -43,18 +43,22 @@ class HomeScreen extends ConsumerWidget {
         horizontal: isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
         vertical: AppSpacing.lg,
       ),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1280),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Greeting (Header)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
+      child: SizedBox(
+        width: double.infinity,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1280),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Greeting (Header)
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -74,115 +78,118 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Real Streak Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withOpacity(0.12),
-                      borderRadius: AppSpacing.roundedFull,
-                      border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.local_fire_department, color: AppColors.warning, size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$realStreak Day Streak',
-                          style: AppTypography.labelMedium.copyWith(
-                            color: AppColors.warning,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
+                    // Real Streak Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.12),
+                        borderRadius: AppSpacing.roundedFull,
+                        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.local_fire_department, color: AppColors.warning, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$realStreak Day Streak',
+                            style: AppTypography.labelMedium.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 24),
 
               // Layout: Main Column + Desktop Sidebar
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Left Main Column
-                  Expanded(
-                    flex: 8,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Continue Learning Section (Real dynamic enrolled course)
-                        _buildContinueLearning(context, ref),
-                        const SizedBox(height: 28),
-
-                        // Categories Scroll
-                        _buildCategories(context, ref, selectedCategory),
-                        const SizedBox(height: 28),
-
-                        // Featured Courses Section
-                        _buildFeaturedCourses(context, ref, coursesAsync, wishlist),
-                        const SizedBox(height: 36),
-
-                        // Why Choose EduSphere (Value Proposition)
-                        _buildWhyChooseUs(context),
-                        const SizedBox(height: 36),
-
-                        // Trending Instructors
-                        _buildTrendingInstructors(context),
-                        const SizedBox(height: 36),
-
-                        // Student Testimonials
-                        Text(
-                          'What Students Are Saying',
-                          style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 16),
-                        const TestimonialsWidget(),
-                        const SizedBox(height: 36),
-
-                        // CTA Banner
-                        _buildCtaBanner(context),
-                        const SizedBox(height: 48),
-
-                        // Platform Footer
-                        _buildFooter(context),
-                      ],
+              if (isDesktop)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left Main Column
+                    Expanded(
+                      flex: 8,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildContinueLearning(context, ref),
+                          const SizedBox(height: 28),
+                          _buildCategories(context, ref, selectedCategory),
+                          const SizedBox(height: 28),
+                          _buildFeaturedCourses(context, ref, coursesAsync, wishlist),
+                          const SizedBox(height: 36),
+                          _buildWhyChooseUs(context),
+                          const SizedBox(height: 36),
+                          _buildTrendingInstructors(context),
+                          const SizedBox(height: 36),
+                          Text(
+                            'What Students Are Saying',
+                            style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 16),
+                          const TestimonialsWidget(),
+                          const SizedBox(height: 36),
+                          _buildCtaBanner(context),
+                          const SizedBox(height: 48),
+                          _buildFooter(context),
+                        ],
+                      ),
                     ),
-                  ),
-
-                  // Right Sidebar (Desktop only)
-                  if (isDesktop) ...[
                     const SizedBox(width: 28),
+                    // Right Sidebar (Desktop only)
                     Expanded(
                       flex: 4,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Real Streak Card
                           _buildStreakCard(realStreak),
                           const SizedBox(height: 20),
-
-                          // Upcoming Deadlines Card
                           _buildUpcomingCard(context),
                           const SizedBox(height: 20),
-
-                          // Real XP & Level Card
                           _buildXpCard(realXp, currentLevel, nextLevelXp, levelProgress),
                         ],
                       ),
                     ),
                   ],
-                ],
-              ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildContinueLearning(context, ref),
+                    const SizedBox(height: 28),
+                    _buildCategories(context, ref, selectedCategory),
+                    const SizedBox(height: 28),
+                    _buildFeaturedCourses(context, ref, coursesAsync, wishlist),
+                    const SizedBox(height: 36),
+                    _buildWhyChooseUs(context),
+                    const SizedBox(height: 36),
+                    _buildTrendingInstructors(context),
+                    const SizedBox(height: 36),
+                    Text(
+                      'What Students Are Saying',
+                      style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 16),
+                    const TestimonialsWidget(),
+                    const SizedBox(height: 36),
+                    _buildCtaBanner(context),
+                    const SizedBox(height: 48),
+                    _buildFooter(context),
+                  ],
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildContinueLearning(BuildContext context, WidgetRef ref) {
     final myEnrolledAsync = ref.watch(myEnrolledCoursesProvider);
@@ -190,42 +197,87 @@ class HomeScreen extends ConsumerWidget {
     return myEnrolledAsync.when(
       data: (items) {
         if (items.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: AppSpacing.roundedLg,
-              border: Border.all(color: AppColors.surfaceContainerHigh),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondaryFixedDim.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.school, color: AppColors.secondary, size: 28),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 450;
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppSpacing.roundedLg,
+                  border: Border.all(color: AppColors.surfaceContainerHigh),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Start Your Learning Journey', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('Explore top courses and start learning today.', style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
-                    ],
-                  ),
-                ),
-                AppButton(
-                  label: 'Explore',
-                  variant: ButtonVariant.primary,
-                  size: ButtonSize.sm,
-                  onPressed: () => context.go('/courses'),
-                ),
-              ],
-            ),
+                child: isCompact
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryFixedDim.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.school, color: AppColors.secondary, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Start Your Learning Journey', style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 2),
+                                    Text('Explore top courses and start learning today.', style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: AppButton(
+                              label: 'Explore Courses',
+                              variant: ButtonVariant.primary,
+                              size: ButtonSize.sm,
+                              onPressed: () => context.go('/courses'),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryFixedDim.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.school, color: AppColors.secondary, size: 28),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Start Your Learning Journey', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 2),
+                                Text('Explore top courses and start learning today.', style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          AppButton(
+                            label: 'Explore',
+                            variant: ButtonVariant.primary,
+                            size: ButtonSize.sm,
+                            onPressed: () => context.go('/courses'),
+                          ),
+                        ],
+                      ),
+              );
+            },
           );
         }
 
@@ -265,29 +317,26 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   Container(height: 4, color: AppColors.secondaryContainer),
                   Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: AppSpacing.roundedMd,
-                          child: SizedBox(
-                            width: 120,
-                            height: 75,
-                            child: AppHelpers.buildCachedImage(
-                              imageUrl: course.thumbnailUrl,
-                              width: 120,
-                              height: 75,
-                              fit: BoxFit.cover,
-                              memCacheWidth: 300,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
+                    padding: const EdgeInsets.all(16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 450;
+                        if (isCompact) {
+                          return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              ClipRRect(
+                                borderRadius: AppSpacing.roundedMd,
+                                child: AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: AppHelpers.buildCachedImage(
+                                    imageUrl: course.thumbnailUrl,
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: 400,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -306,7 +355,7 @@ class HomeScreen extends ConsumerWidget {
                               Text(
                                 course.title,
                                 style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
@@ -317,17 +366,83 @@ class HomeScreen extends ConsumerWidget {
                               const SizedBox(height: 12),
                               AppProgressBar(progress: enrol.progress, showPercentage: true),
                               const SizedBox(height: 12),
-                              AppButton(
-                                label: enrol.progress >= 1.0 ? 'Review Course' : 'Resume Course',
-                                variant: ButtonVariant.primary,
-                                size: ButtonSize.sm,
-                                icon: Icons.play_arrow,
-                                onPressed: () => context.go('/lesson/${course.id}/$firstLesson'),
+                              SizedBox(
+                                width: double.infinity,
+                                child: AppButton(
+                                  label: enrol.progress >= 1.0 ? 'Review Course' : 'Resume Course',
+                                  variant: ButtonVariant.primary,
+                                  size: ButtonSize.sm,
+                                  icon: Icons.play_arrow,
+                                  onPressed: () => context.go('/lesson/${course.id}/$firstLesson'),
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: AppSpacing.roundedMd,
+                              child: SizedBox(
+                                width: 120,
+                                height: 75,
+                                child: AppHelpers.buildCachedImage(
+                                  imageUrl: course.thumbnailUrl,
+                                  width: 120,
+                                  height: 75,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 300,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.secondaryFixedDim.withOpacity(0.25),
+                                      borderRadius: AppSpacing.roundedSm,
+                                    ),
+                                    child: Text(
+                                      course.category,
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: AppColors.secondary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    course.title,
+                                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${(enrol.progress * 100).round()}% Completed • ${course.instructor.name}',
+                                    style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  AppProgressBar(progress: enrol.progress, showPercentage: true),
+                                  const SizedBox(height: 12),
+                                  AppButton(
+                                    label: enrol.progress >= 1.0 ? 'Review Course' : 'Resume Course',
+                                    variant: ButtonVariant.primary,
+                                    size: ButtonSize.sm,
+                                    icon: Icons.play_arrow,
+                                    onPressed: () => context.go('/lesson/${course.id}/$firstLesson'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -388,13 +503,18 @@ class HomeScreen extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Featured Courses',
-              style: AppTypography.headlineSmall.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+            Expanded(
+              child: Text(
+                'Featured Courses',
+                style: AppTypography.headlineSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: () => context.go('/courses'),
               child: Text(
@@ -411,6 +531,7 @@ class HomeScreen extends ConsumerWidget {
             return LayoutBuilder(
               builder: (context, constraints) {
                 final count = constraints.maxWidth >= 700 ? 2 : 1;
+                final ratio = constraints.maxWidth > 500 ? 0.78 : (constraints.maxWidth < 380 ? 0.64 : 0.70);
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -418,7 +539,7 @@ class HomeScreen extends ConsumerWidget {
                     crossAxisCount: count,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: constraints.maxWidth > 500 ? 0.78 : 0.74,
+                    childAspectRatio: ratio,
                   ),
                   itemCount: featured.length,
                   itemBuilder: (context, index) {
@@ -450,16 +571,22 @@ class HomeScreen extends ConsumerWidget {
               },
             );
           },
-          loading: () => GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.78,
-            children: const [
-              CourseCardSkeleton(),
-              CourseCardSkeleton(),
-            ],
+          loading: () => LayoutBuilder(
+            builder: (context, constraints) {
+              final count = constraints.maxWidth >= 700 ? 2 : 1;
+              final ratio = constraints.maxWidth > 500 ? 0.78 : (constraints.maxWidth < 380 ? 0.64 : 0.70);
+              return GridView.count(
+                crossAxisCount: count,
+                shrinkWrap: true,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: ratio,
+                children: const [
+                  CourseCardSkeleton(),
+                  CourseCardSkeleton(),
+                ],
+              );
+            },
           ),
           error: (err, _) => Text('Error loading courses: $err'),
         ),
@@ -497,14 +624,61 @@ class HomeScreen extends ConsumerWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 700;
+
+            if (!isWide) {
+              return Column(
+                children: features.map((feat) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppSpacing.roundedLg,
+                      border: Border.all(color: AppColors.surfaceContainerHigh),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryFixedDim.withOpacity(0.2),
+                            borderRadius: AppSpacing.roundedMd,
+                          ),
+                          child: Icon(feat['icon'] as IconData, color: AppColors.secondary, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                feat['title'] as String,
+                                style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                feat['desc'] as String,
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.outline, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            }
+
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isWide ? 3 : 1,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 14,
-                childAspectRatio: isWide ? 1.5 : (constraints.maxWidth < 400 ? 1.85 : 2.4),
+                childAspectRatio: 1.2,
               ),
               itemCount: features.length,
               itemBuilder: (context, index) {

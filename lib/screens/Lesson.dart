@@ -1240,45 +1240,49 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                       border: Border.all(color: AppColors.surfaceContainerHigh),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        AppButton(
-                          label: 'Previous',
-                          variant: ButtonVariant.outline,
-                          size: ButtonSize.sm,
-                          icon: Icons.arrow_back,
-                          onPressed: hasPrevious
-                              ? () {
-                                  final prevLesson = allLessons[currentIndex - 1];
-                                  setState(() {
-                                    _currentLessonId = prevLesson.id;
-                                    _noteController.text = currentEnrolment.lessonNotes[prevLesson.id] ?? '';
-                                  });
-                                }
-                              : null,
-                        ),
-                        AppButton(
-                          label: 'Next Lesson',
-                          variant: ButtonVariant.primary,
-                          size: ButtonSize.sm,
-                          icon: Icons.arrow_forward,
-                          onPressed: hasNext
-                              ? () {
-                                  final nextLesson = allLessons[currentIndex + 1];
-                                  setState(() {
-                                    _currentLessonId = nextLesson.id;
-                                    _noteController.text = currentEnrolment.lessonNotes[nextLesson.id] ?? '';
-                                  });
-                                }
-                              : () {
-                                  // Completed last lesson -> route to quiz or certificates
-                                  if (course.quizzes.isNotEmpty) {
-                                    context.go('/quiz/${course.quizzes.first.id}');
-                                  } else {
-                                    _handleCompleteLesson(course, allLessons[currentIndex]);
-                                    context.go('/my-learning');
+                        Expanded(
+                          child: AppButton(
+                            label: 'Previous',
+                            variant: ButtonVariant.outline,
+                            size: ButtonSize.sm,
+                            icon: Icons.arrow_back,
+                            onPressed: hasPrevious
+                                ? () {
+                                    final prevLesson = allLessons[currentIndex - 1];
+                                    setState(() {
+                                      _currentLessonId = prevLesson.id;
+                                      _noteController.text = currentEnrolment.lessonNotes[prevLesson.id] ?? '';
+                                    });
                                   }
-                                },
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AppButton(
+                            label: 'Next Lesson',
+                            variant: ButtonVariant.primary,
+                            size: ButtonSize.sm,
+                            icon: Icons.arrow_forward,
+                            onPressed: hasNext
+                                ? () {
+                                    final nextLesson = allLessons[currentIndex + 1];
+                                    setState(() {
+                                      _currentLessonId = nextLesson.id;
+                                      _noteController.text = currentEnrolment.lessonNotes[nextLesson.id] ?? '';
+                                    });
+                                  }
+                                : () {
+                                    // Completed last lesson -> route to quiz or certificates
+                                    if (course.quizzes.isNotEmpty) {
+                                      context.go('/quiz/${course.quizzes.first.id}');
+                                    } else {
+                                      _handleCompleteLesson(course, allLessons[currentIndex]);
+                                      context.go('/my-learning');
+                                    }
+                                  },
+                          ),
                         ),
                       ],
                     ),

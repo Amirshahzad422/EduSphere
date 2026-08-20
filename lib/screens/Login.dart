@@ -91,15 +91,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompact = screenWidth < 400;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 16.0 : 24.0, vertical: isCompact ? 16.0 : 32.0),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 420),
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(isCompact ? 20.0 : 32.0),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: AppSpacing.roundedXl,
@@ -194,8 +197,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 20),
 
                     // Password Field
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
                       children: [
                         Text(
                           'Password',
@@ -322,11 +327,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Continue with Google',
-                                  style: AppTypography.labelLarge.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.onSurface,
+                                Flexible(
+                                  child: Text(
+                                    'Continue with Google',
+                                    style: AppTypography.labelLarge.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.onSurface,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],

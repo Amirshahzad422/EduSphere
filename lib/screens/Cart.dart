@@ -341,7 +341,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Coupon Discount (${appliedCoupon?.code})', style: AppTypography.bodyMedium.copyWith(color: AppColors.secondary)),
+                Expanded(
+                  child: Text(
+                    'Coupon Discount (${appliedCoupon?.code})',
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.secondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text('-${AppFormatters.formatCurrency(discount)}', style: AppTypography.titleSmall.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
               ],
             ),

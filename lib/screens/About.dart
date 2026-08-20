@@ -81,11 +81,15 @@ class _AboutScreenState extends State<AboutScreen> {
                     children: [
                       const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
                       const SizedBox(width: 8),
-                      Text(
-                        'Back to Home',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          'Back to Home',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -157,7 +161,14 @@ class _AboutScreenState extends State<AboutScreen> {
                           child: const Icon(Icons.rocket_launch, color: AppColors.secondary, size: 24),
                         ),
                         const SizedBox(width: 14),
-                        Text('Our Core Mission', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
+                        Expanded(
+                          child: Text(
+                            'Our Core Mission',
+                            style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -176,46 +187,57 @@ class _AboutScreenState extends State<AboutScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 700;
+                  const pillars = [
+                    _PillarCard(
+                      title: 'Zero-Card Serverless Edge',
+                      description: 'Cloudflare Workers & Cloudinary free-tier architecture providing secure signed delivery.',
+                      icon: Icons.shield_outlined,
+                    ),
+                    _PillarCard(
+                      title: 'Verifiable Credentials',
+                      description: 'Tamper-proof PDF certificates with unique cryptographic verification IDs and QR codes.',
+                      icon: Icons.workspace_premium_outlined,
+                    ),
+                    _PillarCard(
+                      title: 'Live Interactive Streaming',
+                      description: 'Low-latency live classrooms with integrated chat, raise-hand, and participant moderation.',
+                      icon: Icons.videocam_outlined,
+                    ),
+                    _PillarCard(
+                      title: 'Gamified Scholar Growth',
+                      description: 'Dynamic XP earning, consecutive learning streaks, achievement badges, and global rankings.',
+                      icon: Icons.bolt,
+                    ),
+                  ];
+
+                  if (!isWide) {
+                    return Column(
+                      children: pillars
+                          .map((p) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: p,
+                              ))
+                          .toList(),
+                    );
+                  }
+
                   return GridView.count(
-                    crossAxisCount: isWide ? 2 : 1,
+                    crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: isWide ? 1.8 : 2.2,
-                    children: const [
-                      _PillarCard(
-                        title: 'Zero-Card Serverless Edge',
-                        description: 'Cloudflare Workers & Cloudinary free-tier architecture providing secure signed delivery.',
-                        icon: Icons.shield_outlined,
-                      ),
-                      _PillarCard(
-                        title: 'Verifiable Credentials',
-                        description: 'Tamper-proof PDF certificates with unique cryptographic verification IDs and QR codes.',
-                        icon: Icons.workspace_premium_outlined,
-                      ),
-                      _PillarCard(
-                        title: 'Live Interactive Streaming',
-                        description: 'Low-latency live classrooms with integrated chat, raise-hand, and participant moderation.',
-                        icon: Icons.videocam_outlined,
-                      ),
-                      _PillarCard(
-                        title: 'Gamified Scholar Growth',
-                        description: 'Dynamic XP earning, consecutive learning streaks, achievement badges, and global rankings.',
-                        icon: Icons.bolt,
-                      ),
-                    ],
+                    childAspectRatio: 1.8,
+                    children: pillars,
                   );
                 },
               ),
               const SizedBox(height: 48),
 
               // Searchable FAQ Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Frequently Asked Questions', style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800)),
-                ],
+              Text(
+                'Frequently Asked Questions',
+                style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               TextField(
