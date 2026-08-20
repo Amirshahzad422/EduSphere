@@ -343,7 +343,7 @@ class CloudinaryUploadService {
           'courseId': courseId,
           'resourceType': resourceType,
         }),
-      );
+      ).timeout(const Duration(seconds: 4));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
         debugPrint('[CloudinaryUploadService] ✅ Cloudinary asset deleted successfully: $publicId');

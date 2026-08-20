@@ -28,6 +28,18 @@ class QuizOption {
     required this.isCorrect,
   });
 
+  QuizOption copyWith({
+    String? id,
+    String? text,
+    bool? isCorrect,
+  }) {
+    return QuizOption(
+      id: id ?? this.id,
+      text: text ?? this.text,
+      isCorrect: isCorrect ?? this.isCorrect,
+    );
+  }
+
   factory QuizOption.fromJson(Map<String, dynamic> json) {
     return QuizOption(
       id: json['id'] as String? ?? '',
@@ -61,6 +73,24 @@ class QuizQuestion {
     this.sampleAnswer = '',
     required this.options,
   });
+
+  QuizQuestion copyWith({
+    String? id,
+    String? question,
+    String? explanation,
+    QuestionType? type,
+    String? sampleAnswer,
+    List<QuizOption>? options,
+  }) {
+    return QuizQuestion(
+      id: id ?? this.id,
+      question: question ?? this.question,
+      explanation: explanation ?? this.explanation,
+      type: type ?? this.type,
+      sampleAnswer: sampleAnswer ?? this.sampleAnswer,
+      options: options ?? this.options,
+    );
+  }
 
   factory QuizQuestion.fromJson(Map<String, dynamic> json) {
     return QuizQuestion(
@@ -108,6 +138,28 @@ class QuizModel {
     this.timeLimitMinutes = 15,
     required this.questions,
   });
+
+  QuizModel copyWith({
+    String? id,
+    String? courseId,
+    String? lessonId,
+    String? title,
+    String? description,
+    int? passingScore,
+    int? timeLimitMinutes,
+    List<QuizQuestion>? questions,
+  }) {
+    return QuizModel(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      lessonId: lessonId ?? this.lessonId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      passingScore: passingScore ?? this.passingScore,
+      timeLimitMinutes: timeLimitMinutes ?? this.timeLimitMinutes,
+      questions: questions ?? this.questions,
+    );
+  }
 
   factory QuizModel.fromJson(Map<String, dynamic> json) {
     return QuizModel(

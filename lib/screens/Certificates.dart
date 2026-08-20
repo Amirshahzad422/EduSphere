@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
+import '../providers/enrolment_provider.dart';
+import '../providers/course_provider.dart';
+import '../models/course_model.dart';
 import '../models/certificate_model.dart';
 import '../services/certificate_service.dart';
 import '../services/certificate_pdf_generator.dart';
@@ -410,9 +413,11 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                       const SizedBox(height: 24),
 
                       // Bottom Signatures + High-Res Scannable QR Code
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.end,
                         children: [
                           // Left Signature (Instructor)
                           Column(
@@ -420,7 +425,7 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 130,
+                                width: 120,
                                 height: 2,
                                 color: const Color(0xFFD4AF37),
                               ),
@@ -445,11 +450,11 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
 
                           // Center Signature (Organizational Excellence)
                           Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 130,
+                                width: 120,
                                 height: 2,
                                 color: const Color(0xFFD4AF37),
                               ),
@@ -489,14 +494,14 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
                                 ),
                                 child: Image.network(
                                   cert.qrCodeUrl,
-                                  width: 80,
-                                  height: 80,
+                                  width: 70,
+                                  height: 70,
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, __, ___) => Container(
-                                    width: 80,
-                                    height: 80,
+                                    width: 70,
+                                    height: 70,
                                     color: const Color(0xFFF1F5F9),
-                                    child: const Icon(Icons.qr_code_2, size: 50, color: Color(0xFF64748B)),
+                                    child: const Icon(Icons.qr_code_2, size: 40, color: Color(0xFF64748B)),
                                   ),
                                 ),
                               ),
@@ -562,13 +567,51 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
     final isDesktop = AppHelpers.isDesktop(context);
+    final enrolments = ref.watch(enrolmentProvider);
+    final coursesAsync = ref.watch(allCoursesProvider);
+    final courses = coursesAsync.maybeWhen(data: (c) => c, orElse: () => <CourseModel>[]);
 
     final userCertsAsync = ref.watch(userCertificatesStreamProvider(user?.id ?? ''));
-    final certificates = userCertsAsync.when(
+    final firestoreCertificates = userCertsAsync.when(
       data: (certs) => certs,
       loading: () => <CertificateModel>[],
       error: (_, __) => <CertificateModel>[],
     );
+
+    // Merge Firestore certificates with any completed enrollments
+    final Map<String, CertificateModel> certsByCourseId = {};
+    for (final cert in firestoreCertificates) {
+      certsByCourseId[cert.courseId] = cert;
+    }
+
+    if (user != null && courses.isNotEmpty) {
+      for (final enrol in enrolments) {
+        if ((enrol.isCompleted || enrol.progress >= 1.0) && !certsByCourseId.containsKey(enrol.courseId)) {
+          final matchingCourses = courses.where((c) => c.id == enrol.courseId).toList();
+          if (matchingCourses.isNotEmpty) {
+            final matchingCourse = matchingCourses.first;
+            final cleanTag = enrol.courseId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+            final tagSub = cleanTag.length > 6 ? cleanTag.substring(0, 6) : cleanTag;
+            final deterministicId = 'EDUS-${user.id.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}-$tagSub';
+
+            certsByCourseId[enrol.courseId] = CertificateModel(
+              id: deterministicId,
+              userId: user.id,
+              userName: user.name,
+              courseId: enrol.courseId,
+              courseTitle: matchingCourse.title,
+              instructorName: matchingCourse.instructor.name,
+              verificationId: deterministicId,
+              qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent("https://verify-certificate.edusphere-app.workers.dev/verify/$deterministicId")}',
+              pdfUrl: 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/certificates/$deterministicId.pdf',
+              issuedAt: enrol.enrolledAt,
+            );
+          }
+        }
+      }
+    }
+
+    final certificates = certsByCourseId.values.toList();
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(

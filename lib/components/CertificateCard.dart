@@ -271,17 +271,12 @@ class CertificateCard extends StatelessWidget {
                           BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
                         ],
                       ),
-                      child: Image.network(
-                        certificate.qrCodeUrl,
+                      child: AppHelpers.buildCachedImage(
+                        imageUrl: certificate.qrCodeUrl,
                         width: 52,
                         height: 52,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 52,
-                          height: 52,
-                          color: const Color(0xFFF1F5F9),
-                          child: const Icon(Icons.qr_code_2, size: 30, color: Color(0xFF64748B)),
-                        ),
+                        memCacheWidth: 150,
                       ),
                     ),
                     const SizedBox(height: 2),

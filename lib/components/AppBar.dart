@@ -64,6 +64,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   onTap: () => context.go(homeTarget),
                   borderRadius: AppSpacing.roundedMd,
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
@@ -77,13 +78,16 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                           size: 20,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        isInstructor ? 'EduSphere Instructor' : 'EduSphere',
-                        style: AppTypography.titleLarge.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          fontSize: 20,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          (isDesktop && isInstructor) ? 'EduSphere Instructor' : 'EduSphere',
+                          style: AppTypography.titleLarge.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            fontSize: isDesktop ? 20 : 18,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -118,15 +122,15 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
               if (actions != null)
                 ...actions!
               else ...[
-                // Udemy-Style "Switch to Instructor / Switch to Student" Quick Button
-                if (user != null)
+                // Udemy-Style "Switch to Instructor / Switch to Student" Quick Button (Desktop only, mobile has it in profile dropdown and bottom nav)
+                if (user != null && isDesktop)
                   if (!isInstructor)
                     // In Student Mode -> Offer Switch to Instructor View
                     Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: TextButton.icon(
                         icon: const Icon(Icons.school, size: 18),
-                        label: Text(isDesktop ? 'Instructor View' : 'Teach'),
+                        label: const Text('Instructor View'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.secondary,
                           textStyle: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700),
@@ -144,7 +148,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                       padding: const EdgeInsets.only(right: 8.0),
                       child: TextButton.icon(
                         icon: const Icon(Icons.auto_stories, size: 18),
-                        label: Text(isDesktop ? 'Student View' : 'Learn'),
+                        label: const Text('Student View'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           textStyle: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700),
@@ -160,6 +164,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 if (!isInstructor) ...[
                   // Cart Icon with Badge (Students only)
                   IconButton(
+                    visualDensity: VisualDensity.compact,
                     icon: Badge(
                       label: Text('${cartItems.length}'),
                       isLabelVisible: cartItems.isNotEmpty,
@@ -172,6 +177,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
                   // Wishlist Icon (Students only)
                   IconButton(
+                    visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.favorite_border, color: AppColors.onSurface),
                     onPressed: () => context.go('/wishlist'),
                     tooltip: 'Wishlist',
@@ -199,6 +205,8 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 // User Profile Dropdown
                 if (user != null)
                   PopupMenuButton<String>(
+                    tooltip: 'Account Menu',
+                    constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
                     onSelected: (val) {
                       if (val == 'profile') {
                         context.go('/profile');
@@ -219,7 +227,13 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                           children: [
                             const Icon(Icons.person_outline, size: 18),
                             const SizedBox(width: 8),
-                            Text('${user.name} (${user.role.name.toUpperCase()})'),
+                            Expanded(
+                              child: Text(
+                                '${user.name} (${user.role.name.toUpperCase()})',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -233,9 +247,13 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                               color: AppColors.secondary,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              isInstructor ? 'Switch to Student View' : 'Switch to Instructor View',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            Expanded(
+                              child: Text(
+                                isInstructor ? 'Switch to Student View' : 'Switch to Instructor View',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                             ),
                           ],
                         ),
@@ -247,7 +265,14 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                           children: [
                             Icon(Icons.logout, size: 18, color: AppColors.error),
                             SizedBox(width: 8),
-                            Text('Log Out', style: TextStyle(color: AppColors.error)),
+                            Expanded(
+                              child: Text(
+                                'Log Out',
+                                style: TextStyle(color: AppColors.error),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
                           ],
                         ),
                       ),

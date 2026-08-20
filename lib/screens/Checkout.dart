@@ -652,9 +652,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Widget _receiptRow(String title, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
-        Text(value, style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course_model.dart';
 import '../utils/constants.dart';
 import 'firebase_service.dart';
+import 'cloudinary_upload_service.dart';
 
 class CourseService {
   static final List<CourseModel> _locallyCreatedCourses = [];
@@ -170,34 +171,17 @@ class CourseService {
     ),
   ];
 
-  /// Returns all available courses directly from Firestore or memory cache
+  /// Returns all available courses directly from memory cache instantly (0ms) with background Firestore sync
   Future<List<CourseModel>> getCourses() async {
-    // 1. If we already have base courses cached in memory, return combined list instantly
+    // 1. If already initialized, return combined list instantly (0ms)
     if (_baseCourses.isNotEmpty) {
       _triggerBackgroundFirestoreSync();
       return _buildCombinedList(_baseCourses);
     }
 
+    // 2. First-time initialization: instant seed in memory & trigger background sync
     _baseCourses = List.from(_defaultProductionCourses);
-
-    // 2. Query Firestore live
-    if (FirebaseService.isInitialized) {
-      try {
-        final querySnapshot = await FirebaseFirestore.instance
-            .collection(AppConstants.coursesCollection)
-            .get()
-            .timeout(const Duration(milliseconds: 2500));
-
-        if (querySnapshot.docs.isNotEmpty) {
-          _baseCourses = querySnapshot.docs
-              .map((doc) => CourseModel.fromJson(doc.data()))
-              .toList();
-        }
-      } catch (e) {
-        debugPrint('[CourseService] Firestore get note: $e');
-      }
-    }
-
+    _triggerBackgroundFirestoreSync();
     return _buildCombinedList(_baseCourses);
   }
 
@@ -348,5 +332,141 @@ class CourseService {
   Future<List<CourseModel>> getTrendingCourses() async {
     final all = await getCourses();
     return all.where((c) => c.isTrending).toList();
+  }
+
+  /// Permanently deletes a course from Firestore, in-memory caches, and purges all its Cloudinary assets
+  Future<bool> deleteCourse(
+    String courseId, {
+    String? userId,
+    String? userToken,
+    CloudinaryUploadService? uploadService,
+  }) async {
+    // 1. Locate the course to inspect its Cloudinary assets
+    final course = await getCourseById(courseId);
+
+    // 2. Delete all Cloudinary assets if course was found
+    if (course != null) {
+      final uploader = uploadService ?? CloudinaryUploadService();
+
+      // a) Delete lesson videos and downloadable resources
+      for (final module in course.syllabus) {
+        for (final lesson in module.lessons) {
+          // Video asset
+          if (lesson.videoUrl.isNotEmpty &&
+              !lesson.videoUrl.startsWith('http') &&
+              !lesson.videoUrl.startsWith('sample_')) {
+            try {
+              await uploader.deleteCloudinaryAsset(
+                publicId: lesson.videoUrl,
+                resourceType: 'video',
+                courseId: courseId,
+                idToken: userToken,
+              );
+            } catch (e) {
+              debugPrint('[CourseService] Error deleting lesson video: $e');
+            }
+          }
+
+          // Lesson resources (PDFs, ZIPs, Blueprints)
+          for (final res in lesson.resources) {
+            final pubId = res.cloudinaryPublicId;
+            if (pubId != null &&
+                pubId.isNotEmpty &&
+                !pubId.startsWith('http')) {
+              try {
+                final resType = (res.type.toLowerCase() == 'image' ||
+                        res.type.toLowerCase() == 'png' ||
+                        res.type.toLowerCase() == 'jpg')
+                    ? 'image'
+                    : 'raw';
+                await uploader.deleteCloudinaryAsset(
+                  publicId: pubId,
+                  resourceType: resType,
+                  courseId: courseId,
+                  idToken: userToken,
+                );
+              } catch (e) {
+                debugPrint('[CourseService] Error deleting lesson resource: $e');
+              }
+            }
+          }
+        }
+      }
+
+      // b) Delete Course thumbnail if hosted on Cloudinary
+      if (course.thumbnailUrl.isNotEmpty &&
+          course.thumbnailUrl.contains('res.cloudinary.com') &&
+          !course.thumbnailUrl.contains('images.unsplash.com')) {
+        try {
+          final uri = Uri.parse(course.thumbnailUrl);
+          final segments = uri.pathSegments;
+          final uploadIndex = segments.indexOf('upload');
+          if (uploadIndex != -1 && uploadIndex + 1 < segments.length) {
+            final afterUpload = segments.sublist(uploadIndex + 1);
+            final publicSegments = afterUpload.where((s) => !RegExp(r'^v\d+$').hasMatch(s)).toList();
+            if (publicSegments.isNotEmpty) {
+              final publicIdWithExt = publicSegments.join('/');
+              final dotIndex = publicIdWithExt.lastIndexOf('.');
+              final publicId = dotIndex != -1 ? publicIdWithExt.substring(0, dotIndex) : publicIdWithExt;
+              await uploader.deleteCloudinaryAsset(
+                publicId: publicId,
+                resourceType: 'image',
+                courseId: courseId,
+                idToken: userToken,
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[CourseService] Error deleting thumbnail: $e');
+        }
+      }
+    }
+
+    // 3. Remove from in-memory caches
+    _locallyCreatedCourses.removeWhere((c) => c.id == courseId);
+    _baseCourses.removeWhere((c) => c.id == courseId);
+    _additionalEnrolments.remove(courseId);
+    _additionalRatings.remove(courseId);
+
+    // 4. Delete from Firestore
+    if (FirebaseService.isInitialized) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        // Delete course document
+        await firestore.collection(AppConstants.coursesCollection).doc(courseId).delete();
+
+        // Delete associated quizzes
+        try {
+          final quizDocs = await firestore
+              .collection(AppConstants.quizzesCollection)
+              .where('courseId', isEqualTo: courseId)
+              .get();
+          for (final doc in quizDocs.docs) {
+            await doc.reference.delete();
+          }
+        } catch (e) {
+          debugPrint('[CourseService] Quizzes cleanup note: $e');
+        }
+
+        // Delete associated live classes
+        try {
+          final liveDocs = await firestore
+              .collection('liveClasses')
+              .where('courseId', isEqualTo: courseId)
+              .get();
+          for (final doc in liveDocs.docs) {
+            await doc.reference.delete();
+          }
+        } catch (e) {
+          debugPrint('[CourseService] Live classes cleanup note: $e');
+        }
+
+        debugPrint('[CourseService] ✅ Course "$courseId" and all assets permanently deleted.');
+      } catch (e) {
+        debugPrint('[CourseService] Firestore course deletion error: $e');
+      }
+    }
+
+    return true;
   }
 }

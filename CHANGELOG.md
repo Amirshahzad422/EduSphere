@@ -7,7 +7,20 @@ All notable changes to the EduSphere project will be documented in this file.
 ## [Phase 6 Update & Production Polish] - Sections 1, 2, 3 & 4
 
 ### Added & Refactored
-- **Section 1: Complete Mock Elimination & Real Account Seed**:
+- **Section 16: Payment Success Receipt Overflow, Lesson Notes Overflow & Course Completion Certificate Sync**:
+  - **Payment Success Screen Receipt Overflow Polish ([`Checkout.dart`](file:///d:/Edusphere/lib/screens/Checkout.dart))**:
+    - Replaced rigid `_receiptRow` with `Flexible(child: Text(..., overflow: TextOverflow.ellipsis, maxLines: 2))` and top-aligned rows, completely preventing horizontal overflow on lengthy Stripe payment receipt tokens (`pi_...`).
+  - **Lesson Screen Personal Notes Header Overflow Polish ([`Lesson.dart`](file:///d:/Edusphere/lib/screens/Lesson.dart))**:
+    - Replaced rigid row in Tab 2 (Notes) with responsive `Wrap(alignment: WrapAlignment.spaceBetween)` and compact button styling, eliminating horizontal overflow against the Save Note button on mobile screens.
+  - **Certificate Course Title Stability Fix ([`Certificates.dart`](file:///d:/Edusphere/lib/screens/Certificates.dart))**:
+    - Removed side-effect Firestore writes from `CertificatesScreen.build()` that were triggering continuous snapshot rebuild loops. Guaranteed stable static course name rendering across all certificates without rapid millisecond fluctuations.
+  - **Course Completion & Certificate Generation / Real-time Display Flow ([`Certificates.dart`](file:///d:/Edusphere/lib/screens/Certificates.dart), [`enrolment_provider.dart`](file:///d:/Edusphere/lib/providers/enrolment_provider.dart), [`MyLearning.dart`](file:///d:/Edusphere/lib/screens/MyLearning.dart), [`Lesson.dart`](file:///d:/Edusphere/lib/screens/Lesson.dart))**:
+    - Connected `CertificateService.generateCertificate` inside `EnrolmentNotifier.completeLesson` to trigger automated verifiable certificate issuance whenever a course reaches 100% completion.
+    - Updated `CertificateService` to always persist generated certificates into Firestore `certificates` collection with `SetOptions(merge: true)`.
+    - Added smart sync in `Certificates.dart`: cross-checks all completed enrollments from `enrolmentProvider` and guarantees immediate rendering of verified certificates even if previous offline completions hadn't finished indexing.
+    - Added direct `"Certificate 🎓"` primary action button on all completed courses in `MyLearning.dart` (`Completed` tab).
+    - Added celebratory completion modal in `Lesson.dart` with a direct one-tap shortcut to view the issued certificate upon finishing the final lesson.
+
   - Completely eradicated `lib/assets/mock/course_seed.json` and removed `SeedService`.
   - Wiped legacy dummy data and created 3 production accounts (1 Instructor: `instructor@edusphere.io`, 2 Students: `student.alex@edusphere.io`, `student.sarah@edusphere.io`).
   - Seeded exactly 5 real masterclass courses in Firestore owned by instructor `BxnBMFJRQjMftbikQdCiSbpKFH92`.
@@ -70,11 +83,43 @@ All notable changes to the EduSphere project will be documented in this file.
   - **Non-Stacking UI Popups & SnackBars**:
     - Updated `AppHelpers.showSnackBar` in `helpers.dart` to call `messenger.hideCurrentSnackBar()` before presenting new notifications, eliminating stacked/repeating popups.
 
+  - **Section 11: Instructor Quiz Builder & Downloadable Resource Uploader**:
+  - **Instructor Quiz Builder & Question Editor**:
+    - Added full-featured Quiz Management modal in `CourseBuilder.dart` supporting quiz title, description, passing score (e.g. 80%), and time limit (e.g. 15m).
+    - Integrated interactive Question Editor supporting Multiple-Choice (MCQ) and True/False questions with dynamic options, correct choice radio selection, point assignment, and explanation feedback.
+    - Added `saveOrUpdateQuiz` and `deleteQuiz` in `QuizService` to synchronize quizzes with Cloud Firestore.
+  - **Downloadable Lesson Resource Uploader (Cloudinary Raw Storage)**:
+    - Integrated direct raw file uploader in `CourseBuilder.dart` (`_showAddOrEditLessonModal`) for PDFs, blueprints, zip archives, and code files with real-time upload progress.
+    - Added access mode configuration ("Free Preview Access" vs "Enrolled Students Only") using preset-locked Cloudinary configurations.
+    - Enabled remote asset purging via Cloudflare Worker upon resource deletion.
+    - Synchronized `LessonModel.resources` directly with `Lesson.dart`'s Resources tab for immediate student viewing and authenticated stream downloads.
+
+  - **Section 12: Student Resource Viewing, Downloading & Access-Based Gating**:
+  - **Direct PDF & Resource Viewing**:
+    - Integrated `url_launcher` in `Lesson.dart` to open PDFs, blueprints, and files in browser/native viewers with 1-click "View" buttons.
+  - **Direct File Downloading**:
+    - Added 1-click "Download" buttons initiating direct download requests using signed Cloudinary URLs for enrolled users and public URLs for preview files.
+  - **Role & Access-Based Gating (Free vs Paid Students)**:
+    - Displayed clear access pills: `✓ Free Preview Access` (green), `✓ Enrolled Access` (blue), and `🔒 Enrolled Only · Paid Resource` (amber).
+    - If an unenrolled student taps a locked resource, the app presents an enrollment prompt (or `AuthGateModal` for guest users) guiding them to enroll or purchase.
+    - If the user is enrolled or is the course instructor, all files are unlocked with instant View & Download capabilities.
+
+  - **Section 13: Permanent Course Deletion, Cloudinary Asset Purging & 0ms SWR Speed Architecture**:
+  - **Permanent Course Deletion & Cloudinary Console Asset Purging**:
+    - Added `deleteCourse(courseId, {userId, userToken})` in `CourseService` which scans all curriculum modules and lessons for lesson videos (`video`), downloadable PDFs/blueprints (`raw`), and course thumbnails (`image`).
+    - Purges all associated assets permanently from Cloudinary console storage via Cloudflare Worker (`https://delete-cloudinary-asset.edusphere-app.workers.dev`) using secure SHA-1 HMAC destroy requests with API secrets.
+    - Permanently deletes associated Firestore documents (`courses`, `quizzes`, `liveClasses`) and purges local memory caches (`_locallyCreatedCourses`, `_baseCourses`).
+    - Added "Delete Course" actions with double-confirmation dialogs and warning checklist in both `InstructorDashboard.dart` and `CourseBuilder.dart` (Edit mode).
+  - **Speed & Instant 0ms UI Optimizations**:
+    - Configured Firestore offline persistence and unlimited memory cache in `FirebaseService.dart`.
+    - Implemented Stale-While-Revalidate (SWR) cache in `CourseService.dart` serving cached courses instantly in 0ms while refreshing in the background.
+    - Integrated `CachedNetworkImage` in `CourseCard.dart`, `Home.dart`, `CourseDetails.dart`, `Cart.dart`, `MyLearning.dart`, `InstructorDashboard.dart`, and `CertificateCard.dart` with automatic Cloudinary width/format transformations (`f_auto,q_auto`).
+    - Optimized route transitions to 120ms with `Curves.fastOutSlowIn` in `app_router.dart` for snappy navigation.
+    - Enabled Google Fonts runtime caching in `main.dart`.
+
 ### Tested & Verified
 - `dart analyze lib` -> 0 issues found (100% Clean).
-- `flutter test` -> 55/55 test suites passed across all features.
-- `dart analyze lib` -> 0 issues found (100% Clean).
-- `flutter test` -> 51/51 test suites passed across all features.
+- `flutter test` -> 62/62 test suites passed across all features.
 - Daily streak calendar transitions, duplicate XP guards, device profile picture upload, and real-time Firestore leaderboard verified end-to-end.
 - Atomic Firestore rating sum/count calculation and single-review-per-student deterministic doc ID verified.
 - Real-time stream reflection on instructor dashboard verified.

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/course_provider.dart';
 import '../providers/enrolment_provider.dart';
 import '../providers/auth_provider.dart';
+import '../models/course_model.dart';
 import '../models/lesson_model.dart';
+import '../models/user_model.dart';
 import '../models/enrolment_model.dart';
 import '../services/lesson_stream_service.dart';
 import '../styles/colors.dart';
@@ -14,6 +17,7 @@ import '../components/VideoPlayer.dart';
 import '../components/LessonList.dart';
 import '../components/Button.dart';
 import '../components/Loader.dart';
+import '../components/AuthGateModal.dart';
 import '../utils/helpers.dart';
 import '../utils/auth_gate.dart';
 
@@ -127,6 +131,409 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
       }
     } catch (_) {}
     return 600;
+  }
+
+  Future<void> _handleOpenResource({
+    required BuildContext context,
+    required CourseModel course,
+    required LessonModel lesson,
+    required LessonResource resource,
+    required bool isEnrolled,
+    required bool isAuthor,
+    required UserModel? authUser,
+    required LessonStreamService streamService,
+    required bool isDownload,
+  }) async {
+    final canAccess = isEnrolled || isAuthor || lesson.isPreview || resource.isPreview;
+
+    if (!canAccess) {
+      if (authUser == null) {
+        AuthGateModal.show(
+          context,
+          actionTitle: 'Unlock Lesson Resource',
+          reason: 'Sign in to access and download "${resource.title}".',
+          onAuthenticated: () {},
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+            title: Row(
+              children: [
+                const Icon(Icons.lock_outline, color: AppColors.secondary),
+                const SizedBox(width: 10),
+                const Text('Course Enrollment Required', style: TextStyle(fontWeight: FontWeight.w700)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The resource "${resource.title}" is exclusive to enrolled students.',
+                  style: AppTypography.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Enroll in "${course.title}" to unlock all lecture videos, downloadable PDFs, blueprints, quizzes, and earn an official verifiable certificate.',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              AppButton(
+                label: course.price == 0 ? 'Enroll for Free' : 'Enroll Now (\$${course.price.toStringAsFixed(2)})',
+                variant: ButtonVariant.secondary,
+                size: ButtonSize.sm,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (course.price == 0) {
+                    ref.read(enrolmentProvider.notifier).enroll(course.id, authUser.id);
+                    AppHelpers.showSnackBar(context, '🎉 Successfully enrolled! Resource unlocked.');
+                  } else {
+                    context.push('/checkout/${course.id}');
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      AppHelpers.showSnackBar(
+        context,
+        isDownload
+            ? 'Fetching secure download link for ${resource.title}...'
+            : 'Opening ${resource.title}...',
+      );
+
+      final result = await streamService.getResourceDeliveryUrl(
+        courseId: course.id,
+        lesson: lesson,
+        resource: resource,
+        userId: authUser?.id ?? 'guest',
+        isEnrolled: isEnrolled || isAuthor,
+      );
+
+      final url = result.streamUrl;
+      if (url.isEmpty) {
+        if (context.mounted) {
+          AppHelpers.showSnackBar(context, 'Unable to generate delivery URL for this resource.', isError: true);
+        }
+        return;
+      }
+
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+
+      if (context.mounted) {
+        AppHelpers.showSnackBar(
+          context,
+          isDownload
+              ? '📥 Downloading ${resource.title}'
+              : '📄 Viewing ${resource.title}',
+        );
+      }
+    } on LessonAccessDeniedException catch (e) {
+      if (context.mounted) {
+        AppHelpers.showSnackBar(context, '🔒 ${e.message}', isError: true);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppHelpers.showSnackBar(context, 'Failed to open resource: $e', isError: true);
+      }
+    }
+  }
+
+  Widget _buildResourceCard({
+    required BuildContext context,
+    required CourseModel course,
+    required LessonModel lesson,
+    required LessonResource resource,
+    required bool isEnrolled,
+    required bool isAuthor,
+    required UserModel? authUser,
+    required LessonStreamService streamService,
+    String? lessonContextTitle,
+  }) {
+    final canAccess = isEnrolled || isAuthor || lesson.isPreview || resource.isPreview;
+    final isPdf = resource.type.toLowerCase() == 'pdf';
+    final isZip = resource.type.toLowerCase() == 'zip';
+    final isDoc = resource.type.toLowerCase().startsWith('doc');
+    final isCode = resource.type.toLowerCase() == 'code' || resource.type.toLowerCase() == 'json' || resource.type.toLowerCase() == 'dart';
+
+    final IconData fileIcon = isPdf
+        ? Icons.picture_as_pdf
+        : (isZip
+            ? Icons.folder_zip
+            : (isDoc
+                ? Icons.description
+                : (isCode ? Icons.code : Icons.insert_drive_file_outlined)));
+
+    final Color iconColor = isPdf
+        ? AppColors.error
+        : (isZip
+            ? Colors.orange
+            : (isDoc
+                ? AppColors.secondary
+                : (isCode ? Colors.teal : AppColors.outline)));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppSpacing.roundedMd,
+        border: Border.all(
+          color: canAccess ? AppColors.surfaceContainerHigh : AppColors.outlineVariant.withOpacity(0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, cardConstraints) {
+          final isNarrow = cardConstraints.maxWidth < 450;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: iconColor.withOpacity(0.12),
+                      borderRadius: AppSpacing.roundedSm,
+                    ),
+                    child: Icon(fileIcon, color: iconColor, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resource.title,
+                          style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        if (lessonContextTitle != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Lesson: $lessonContextTitle',
+                            style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: canAccess
+                                    ? (resource.isPreview || lesson.isPreview
+                                        ? AppColors.secondaryContainer
+                                        : AppColors.success.withOpacity(0.12))
+                                    : AppColors.error.withOpacity(0.1),
+                                borderRadius: AppSpacing.roundedSm,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    canAccess ? Icons.check_circle_outline : Icons.lock_outline,
+                                    size: 11,
+                                    color: canAccess
+                                        ? (resource.isPreview || lesson.isPreview
+                                            ? AppColors.onSecondaryContainer
+                                            : AppColors.success)
+                                        : AppColors.error,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    canAccess
+                                        ? (resource.isPreview || lesson.isPreview
+                                            ? 'Free Preview'
+                                            : 'Enrolled Access')
+                                        : '🔒 Enrolled Only',
+                                    style: AppTypography.labelSmall.copyWith(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: canAccess
+                                        ? (resource.isPreview || lesson.isPreview
+                                            ? AppColors.onSecondaryContainer
+                                            : AppColors.success)
+                                        : AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: AppSpacing.roundedSm,
+                              ),
+                              child: Text(
+                                '${resource.type.toUpperCase()} File',
+                                style: AppTypography.labelSmall.copyWith(fontSize: 10, color: AppColors.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isNarrow) ...[
+                    const SizedBox(width: 12),
+                    // Action buttons (Desktop / Wide)
+                    if (canAccess) ...[
+                      AppButton(
+                        label: 'View',
+                        icon: Icons.visibility_outlined,
+                        variant: ButtonVariant.outline,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: false,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AppButton(
+                        label: 'Download',
+                        icon: Icons.download_outlined,
+                        variant: ButtonVariant.secondary,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: true,
+                        ),
+                      ),
+                    ] else ...[
+                      AppButton(
+                        label: 'Unlock File',
+                        icon: Icons.lock_outline,
+                        variant: ButtonVariant.outline,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: false,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+              // Action buttons (Narrow / Mobile)
+              if (isNarrow) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (canAccess) ...[
+                      AppButton(
+                        label: 'View',
+                        icon: Icons.visibility_outlined,
+                        variant: ButtonVariant.outline,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: false,
+                        ),
+                      ),
+                      AppButton(
+                        label: 'Download',
+                        icon: Icons.download_outlined,
+                        variant: ButtonVariant.secondary,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: true,
+                        ),
+                      ),
+                    ] else ...[
+                      AppButton(
+                        label: 'Unlock File',
+                        icon: Icons.lock_outline,
+                        variant: ButtonVariant.outline,
+                        size: ButtonSize.sm,
+                        onPressed: () => _handleOpenResource(
+                          context: context,
+                          course: course,
+                          lesson: lesson,
+                          resource: resource,
+                          isEnrolled: isEnrolled,
+                          isAuthor: isAuthor,
+                          authUser: authUser,
+                          streamService: streamService,
+                          isDownload: false,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -348,14 +755,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                         );
                                   },
                                   onComplete: () {
-                                    final isNew = ref.read(enrolmentProvider.notifier).completeLesson(
-                                          course.id,
-                                          currentLesson.id,
-                                          course.totalLessons,
-                                        );
-                                    if (isNew && mounted) {
-                                      AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
-                                    }
+                                    _handleCompleteLesson(course, currentLesson);
                                   },
                                 );
                               },
@@ -414,14 +814,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                       AppHelpers.showSnackBar(context, 'This lesson is already completed.');
                                       return;
                                     }
-                                    final isNew = ref.read(enrolmentProvider.notifier).completeLesson(
-                                          course.id,
-                                          currentLesson.id,
-                                          course.totalLessons,
-                                        );
-                                    if (isNew && mounted) {
-                                      AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
-                                    }
+                                    _handleCompleteLesson(course, currentLesson);
                                   },
                                 ),
                               ],
@@ -503,16 +896,23 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      Wrap(
+                                        alignment: WrapAlignment.spaceBetween,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        spacing: 8,
+                                        runSpacing: 4,
                                         children: [
                                           Text(
-                                            'Personal Lesson Notes (Auto-Saved)',
+                                            'Personal Lesson Notes',
                                             style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
                                           ),
                                           TextButton.icon(
+                                            style: TextButton.styleFrom(
+                                              visualDensity: VisualDensity.compact,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
                                             icon: const Icon(Icons.save_outlined, size: 16, color: AppColors.secondary),
-                                            label: const Text('Save Note', style: TextStyle(color: AppColors.secondary)),
+                                            label: const Text('Save Note', style: TextStyle(color: AppColors.secondary, fontSize: 12)),
                                             onPressed: () {
                                               ref.read(enrolmentProvider.notifier).saveLessonNote(
                                                     course.id,
@@ -554,102 +954,151 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                     ],
                                   ),
 
-                                  // Tab 3: Resources (Authenticated Cloudinary Raw Files)
-                                  ListView(
-                                    children: [
-                                      if (currentLesson.resources.isNotEmpty)
-                                        ...currentLesson.resources.map((res) {
-                                          final isPdf = res.type.toLowerCase() == 'pdf';
-                                          return ListTile(
-                                            leading: Icon(
-                                              isPdf ? Icons.picture_as_pdf : Icons.attachment,
-                                              color: isPdf ? AppColors.error : AppColors.secondary,
+                                  // Tab 3: Resources (Authenticated Cloudinary Raw Files & PDFs)
+                                  Builder(
+                                    builder: (context) {
+                                      // Collect all other course resources
+                                      final otherResources = <Map<String, dynamic>>[];
+                                      for (final m in course.syllabus) {
+                                        for (final l in m.lessons) {
+                                          if (l.id != currentLesson.id) {
+                                            for (final r in l.resources) {
+                                              otherResources.add({
+                                                'lesson': l,
+                                                'resource': r,
+                                              });
+                                            }
+                                          }
+                                        }
+                                      }
+
+                                      return SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Header Banner
+                                            Container(
+                                              padding: const EdgeInsets.all(14),
+                                              margin: const EdgeInsets.only(bottom: 16),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.surfaceContainerLow,
+                                                borderRadius: AppSpacing.roundedMd,
+                                                border: Border.all(color: AppColors.outlineVariant),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    isEnrolled || isAuthor ? Icons.folder_shared : Icons.lock_person_outlined,
+                                                    color: isEnrolled || isAuthor ? AppColors.secondary : AppColors.outline,
+                                                    size: 24,
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          isEnrolled || isAuthor
+                                                              ? 'Enrolled Scholar Access'
+                                                              : (currentLesson.isPreview ? 'Free Preview Access' : 'Exclusive Course Resources'),
+                                                          style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          isEnrolled || isAuthor
+                                                              ? 'You have unlimited access to view and download all PDFs, blueprints, and assets.'
+                                                              : 'Free preview files can be downloaded by everyone. Paid course assets require active enrollment.',
+                                                          style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                            title: Text(res.title),
-                                            subtitle: Text(
-                                              currentLesson.isPreview || res.isPreview
-                                                  ? 'Free Preview Asset · Cloudinary Raw'
-                                                  : 'Authenticated Enrolled Asset · Signed Cloudinary Raw',
+
+                                            // 1. Current Lesson Resources
+                                            Text(
+                                              'Resources for this Lecture',
+                                              style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w800),
                                             ),
-                                            trailing: const Icon(Icons.download, size: 20, color: AppColors.secondary),
-                                            onTap: () async {
-                                              try {
-                                                await streamService.getResourceDeliveryUrl(
-                                                  courseId: course.id,
+                                            const SizedBox(height: 8),
+
+                                            if (currentLesson.resources.isNotEmpty)
+                                              ...currentLesson.resources.map((res) {
+                                                return _buildResourceCard(
+                                                  context: context,
+                                                  course: course,
                                                   lesson: currentLesson,
                                                   resource: res,
-                                                  userId: authUser?.id ?? 'guest',
                                                   isEnrolled: isEnrolled,
+                                                  isAuthor: isAuthor,
+                                                  authUser: authUser,
+                                                  streamService: streamService,
                                                 );
-                                                if (context.mounted) {
-                                                  AppHelpers.showSnackBar(
-                                                    context,
-                                                    'Downloading ${res.title} from signed Cloudinary stream...',
-                                                  );
-                                                }
-                                              } on LessonAccessDeniedException catch (e) {
-                                                if (context.mounted) {
-                                                  AppHelpers.showSnackBar(
-                                                    context,
-                                                    '🔒 ${e.message}',
-                                                    isError: true,
-                                                  );
-                                                }
-                                              }
-                                            },
-                                          );
-                                        })
-                                      else ...[
-                                        ListTile(
-                                          leading: const Icon(Icons.picture_as_pdf, color: AppColors.error),
-                                          title: const Text('Architecture Blueprint & Source Notes (PDF)'),
-                                          subtitle: Text(
-                                            currentLesson.isPreview
-                                                ? 'Free Preview Asset · Cloudinary Raw'
-                                                : 'Authenticated Enrolled Asset · Signed Cloudinary Raw',
-                                          ),
-                                          trailing: const Icon(Icons.download, size: 20, color: AppColors.secondary),
-                                          onTap: () async {
-                                            try {
-                                              final fallbackRes = LessonResource(
-                                                title: 'Architecture Blueprint (PDF)',
-                                                cloudinaryPublicId: 'edusphere/resources/${course.id}/arch_blueprint',
-                                                type: 'pdf',
-                                                isPreview: currentLesson.isPreview,
-                                              );
-                                              await streamService.getResourceDeliveryUrl(
-                                                courseId: course.id,
+                                              })
+                                            else ...[
+                                              // Fallback sample resources if none explicitly attached to this lesson
+                                              _buildResourceCard(
+                                                context: context,
+                                                course: course,
                                                 lesson: currentLesson,
-                                                resource: fallbackRes,
-                                                userId: authUser?.id ?? 'guest',
+                                                resource: LessonResource(
+                                                  title: '${currentLesson.title} — Blueprint & Notes (PDF)',
+                                                  cloudinaryPublicId: 'resources/${course.id}/${currentLesson.id}_blueprint',
+                                                  type: 'pdf',
+                                                  isPreview: currentLesson.isPreview,
+                                                ),
                                                 isEnrolled: isEnrolled,
-                                              );
-                                              if (context.mounted) {
-                                                AppHelpers.showSnackBar(
-                                                  context,
-                                                  'Downloading authenticated PDF resource from signed Cloudinary stream...',
+                                                isAuthor: isAuthor,
+                                                authUser: authUser,
+                                                streamService: streamService,
+                                              ),
+                                              _buildResourceCard(
+                                                context: context,
+                                                course: course,
+                                                lesson: currentLesson,
+                                                resource: const LessonResource(
+                                                  title: 'Starter Code & Schema Definitions (ZIP)',
+                                                  cloudinaryPublicId: 'resources/demo/starter_code',
+                                                  type: 'zip',
+                                                  isPreview: true,
+                                                ),
+                                                isEnrolled: isEnrolled,
+                                                isAuthor: isAuthor,
+                                                authUser: authUser,
+                                                streamService: streamService,
+                                              ),
+                                            ],
+
+                                            // 2. Other Course Resources
+                                            if (otherResources.isNotEmpty) ...[
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'Other Course Files & Blueprints (${otherResources.length})',
+                                                style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w800),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              ...otherResources.map((item) {
+                                                final otherLesson = item['lesson'] as LessonModel;
+                                                final otherRes = item['resource'] as LessonResource;
+                                                return _buildResourceCard(
+                                                  context: context,
+                                                  course: course,
+                                                  lesson: otherLesson,
+                                                  resource: otherRes,
+                                                  isEnrolled: isEnrolled,
+                                                  isAuthor: isAuthor,
+                                                  authUser: authUser,
+                                                  streamService: streamService,
+                                                  lessonContextTitle: otherLesson.title,
                                                 );
-                                              }
-                                            } on LessonAccessDeniedException catch (e) {
-                                              if (context.mounted) {
-                                                AppHelpers.showSnackBar(
-                                                  context,
-                                                  '🔒 ${e.message}',
-                                                  isError: true,
-                                                );
-                                              }
-                                            }
-                                          },
+                                              }),
+                                            ],
+                                          ],
                                         ),
-                                        ListTile(
-                                          leading: const Icon(Icons.code, color: AppColors.secondary),
-                                          title: const Text('GitHub Reference Code Repository'),
-                                          subtitle: const Text('Complete clean architecture starter'),
-                                          trailing: const Icon(Icons.open_in_new, size: 20),
-                                          onTap: () => AppHelpers.showSnackBar(context, 'Opening GitHub repository...'),
-                                        ),
-                                      ],
-                                    ],
+                                      );
+                                    },
                                   ),
 
                                   // Tab 4: Discussion
@@ -826,6 +1275,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                   if (course.quizzes.isNotEmpty) {
                                     context.go('/quiz/${course.quizzes.first.id}');
                                   } else {
+                                    _handleCompleteLesson(course, allLessons[currentIndex]);
                                     context.go('/my-learning');
                                   }
                                 },
@@ -841,6 +1291,95 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
       },
       loading: () => const Center(child: AppLoader()),
       error: (err, _) => Center(child: Text('Error: $err')),
+    );
+  }
+
+  void _handleCompleteLesson(CourseModel course, LessonModel lesson) {
+    final isNew = ref.read(enrolmentProvider.notifier).completeLesson(
+      course.id,
+      lesson.id,
+      course.totalLessons,
+      courseTitle: course.title,
+      instructorName: course.instructor.name,
+    );
+
+    if (isNew && mounted) {
+      final enrolments = ref.read(enrolmentProvider);
+      final enrol = enrolments.firstWhere(
+        (e) => e.courseId == course.id,
+        orElse: () => EnrolmentModel(
+          id: 'temp',
+          userId: 'user',
+          courseId: course.id,
+          completedLessons: [lesson.id],
+          progress: 1.0,
+          enrolledAt: DateTime.now(),
+        ),
+      );
+
+      if (enrol.isCompleted || enrol.progress >= 1.0) {
+        _showCourseCompletionCelebrationModal(context, course);
+      } else {
+        AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
+      }
+    }
+  }
+
+  void _showCourseCompletionCelebrationModal(BuildContext context, CourseModel course) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedXl),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.workspace_premium_rounded, size: 48, color: AppColors.secondary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '🎉 Course Completed!',
+              style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800, color: AppColors.primary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Congratulations! You have completed 100% of "${course.title}". Your verified certificate of completion is now issued and accredited!',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            AppButton(
+              label: 'View Verified Certificate 🎓',
+              variant: ButtonVariant.secondary,
+              isFullWidth: true,
+              icon: Icons.workspace_premium,
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/certificates');
+              },
+            ),
+            const SizedBox(height: 8),
+            AppButton(
+              label: 'Go to My Learning',
+              variant: ButtonVariant.outline,
+              isFullWidth: true,
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/my-learning');
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

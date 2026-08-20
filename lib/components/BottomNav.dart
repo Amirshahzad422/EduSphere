@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../styles/colors.dart';
+import '../styles/typography.dart';
 import '../utils/auth_gate.dart';
 
 class CustomBottomNav extends ConsumerWidget {
@@ -98,35 +99,47 @@ class CustomBottomNav extends ConsumerWidget {
             top: BorderSide(color: AppColors.surfaceContainerHigh, width: 1),
           ),
         ),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) => _onInstructorTapped(index, context),
-          backgroundColor: Colors.white,
-          indicatorColor: AppColors.secondaryFixedDim.withOpacity(0.35),
-          height: 64,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard, color: AppColors.secondary),
-              label: 'Dashboard',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle, color: AppColors.secondary),
-              label: 'Builder',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet, color: AppColors.secondary),
-              label: 'Earnings',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person, color: AppColors.secondary),
-              label: 'Profile',
-            ),
-          ],
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            labelTextStyle: MaterialStateProperty.resolveWith((states) {
+              final isSelected = states.contains(MaterialState.selected);
+              return AppTypography.labelSmall.copyWith(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? AppColors.secondary : AppColors.outline,
+              );
+            }),
+          ),
+          child: NavigationBar(
+            selectedIndex: selectedIndex,
+            onDestinationSelected: (index) => _onInstructorTapped(index, context),
+            backgroundColor: Colors.white,
+            indicatorColor: AppColors.secondaryFixedDim.withOpacity(0.35),
+            height: 64,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard, color: AppColors.secondary),
+                label: 'Dashboard',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.add_circle_outline),
+                selectedIcon: Icon(Icons.add_circle, color: AppColors.secondary),
+                label: 'Builder',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                selectedIcon: Icon(Icons.account_balance_wallet, color: AppColors.secondary),
+                label: 'Earnings',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person, color: AppColors.secondary),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -139,40 +152,52 @@ class CustomBottomNav extends ConsumerWidget {
           top: BorderSide(color: AppColors.surfaceContainerHigh, width: 1),
         ),
       ),
-      child: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (index) => _onStudentTapped(index, context, ref),
-        backgroundColor: Colors.white,
-        indicatorColor: AppColors.secondaryFixedDim.withOpacity(0.35),
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: AppColors.secondary),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore, color: AppColors.secondary),
-            label: 'Explore',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school, color: AppColors.secondary),
-            label: 'My Learning',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_border),
-            selectedIcon: Icon(Icons.favorite, color: AppColors.secondary),
-            label: 'Wishlist',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: AppColors.secondary),
-            label: 'Profile',
-          ),
-        ],
+      child: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          labelTextStyle: MaterialStateProperty.resolveWith((states) {
+            final isSelected = states.contains(MaterialState.selected);
+            return AppTypography.labelSmall.copyWith(
+              fontSize: 10.5,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected ? AppColors.secondary : AppColors.outline,
+            );
+          }),
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) => _onStudentTapped(index, context, ref),
+          backgroundColor: Colors.white,
+          indicatorColor: AppColors.secondaryFixedDim.withOpacity(0.35),
+          height: 64,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home, color: AppColors.secondary),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore, color: AppColors.secondary),
+              label: 'Explore',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.school_outlined),
+              selectedIcon: Icon(Icons.school, color: AppColors.secondary),
+              label: 'Learning',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.favorite_border),
+              selectedIcon: Icon(Icons.favorite, color: AppColors.secondary),
+              label: 'Wishlist',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person, color: AppColors.secondary),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

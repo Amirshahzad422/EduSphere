@@ -775,16 +775,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.emoji_events, color: AppColors.warning, size: 24),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Global Scholar Leaderboard',
-                              style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.emoji_events, color: AppColors.warning, size: 24),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Global Scholar Leaderboard',
+                                  style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -814,19 +821,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     // Dynamic Leaderboard List from Firestore Stream
                     leaderboardAsync.when(
                       data: (users) {
-                        // Deduplicate by normalized email or ID and filter dummy/ghost test users
+                        // Deduplicate users strictly by unique ID
                         final Map<String, UserModel> userMap = {};
                         for (final u in users) {
                           if (u.id.trim().isNotEmpty && u.name.trim().isNotEmpty && !u.id.startsWith('google_user_')) {
-                            final key = u.email.trim().isNotEmpty ? u.email.trim().toLowerCase() : u.id.trim();
-                            userMap[key] = u;
+                            userMap[u.id.trim()] = u;
                           }
                         }
 
-                        // Merge current session user with their latest local profile info
+                        // Merge current logged-in session user with their latest local profile info
                         if (user != null && user.id.trim().isNotEmpty && user.name.trim().isNotEmpty && !user.id.startsWith('google_user_')) {
-                          final key = user.email.trim().isNotEmpty ? user.email.trim().toLowerCase() : user.id.trim();
-                          userMap[key] = user;
+                          String matchedKey = user.id.trim();
+                          for (final existing in userMap.values) {
+                            if (existing.id.trim() == user.id.trim() ||
+                                (existing.email.trim().isNotEmpty &&
+                                    user.email.trim().isNotEmpty &&
+                                    existing.email.trim().toLowerCase() == user.email.trim().toLowerCase())) {
+                              matchedKey = existing.id.trim();
+                              break;
+                            }
+                          }
+
+                          if (matchedKey != user.id.trim() && userMap.containsKey(matchedKey)) {
+                            userMap.remove(matchedKey);
+                          }
+
+                          userMap[user.id.trim()] = user;
                         }
 
                         final sortedUsers = userMap.values.toList();
@@ -843,7 +863,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           children: sortedUsers.asMap().entries.map((entry) {
                             final rank = entry.key + 1;
                             final u = entry.value;
-                            final isMe = user != null && (u.id == user.id || u.email == user.email);
+                            final isMe = user != null &&
+                                (u.id == user.id ||
+                                    (u.email.isNotEmpty &&
+                                        user.email.isNotEmpty &&
+                                        u.email.toLowerCase() == user.email.toLowerCase()));
 
                             final rankColor = rank == 1
                                 ? const Color(0xFFFFD700)
@@ -945,9 +969,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                           children: [
                                             const Icon(Icons.local_fire_department, size: 12, color: AppColors.warning),
                                             const SizedBox(width: 2),
-                                            Text(
-                                              '${u.streak}d streak • ${u.role.name.toUpperCase()}',
-                                              style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                                            Expanded(
+                                              child: Text(
+                                                '${u.streak}d streak • ${u.role.name.toUpperCase()}',
+                                                style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                              ),
                                             ),
                                           ],
                                         ),

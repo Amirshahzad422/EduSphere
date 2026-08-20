@@ -53,41 +53,48 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Good afternoon,',
-                        style: AppTypography.labelMedium.copyWith(color: AppColors.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        (user != null && user.name.isNotEmpty) ? user.name.split(' ').first : 'Learner',
-                        style: AppTypography.displayMedium.copyWith(
-                          fontSize: isDesktop ? 32 : 24,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Good afternoon,',
+                          style: AppTypography.labelMedium.copyWith(color: AppColors.onSurfaceVariant),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          (user != null && user.name.isNotEmpty) ? user.name.split(' ').first : 'Learner',
+                          style: AppTypography.displayMedium.copyWith(
+                            fontSize: isDesktop ? 32 : 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   // Real Streak Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.warning.withOpacity(0.12),
                       borderRadius: AppSpacing.roundedFull,
                       border: Border.all(color: AppColors.warning.withOpacity(0.3)),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.local_fire_department, color: AppColors.warning, size: 20),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.local_fire_department, color: AppColors.warning, size: 18),
+                        const SizedBox(width: 4),
                         Text(
                           '$realStreak Day Streak',
-                          style: AppTypography.labelLarge.copyWith(
+                          style: AppTypography.labelMedium.copyWith(
                             color: AppColors.warning,
                             fontWeight: FontWeight.w700,
+                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -267,10 +274,12 @@ class HomeScreen extends ConsumerWidget {
                           child: SizedBox(
                             width: 120,
                             height: 75,
-                            child: Image.network(
-                              course.thumbnailUrl,
+                            child: AppHelpers.buildCachedImage(
+                              imageUrl: course.thumbnailUrl,
+                              width: 120,
+                              height: 75,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceContainerLow),
+                              memCacheWidth: 300,
                             ),
                           ),
                         ),
@@ -495,7 +504,7 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisCount: isWide ? 3 : 1,
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 14,
-                childAspectRatio: isWide ? 1.5 : 2.8,
+                childAspectRatio: isWide ? 1.5 : (constraints.maxWidth < 400 ? 1.85 : 2.4),
               ),
               itemCount: features.length,
               itemBuilder: (context, index) {
@@ -675,10 +684,14 @@ class HomeScreen extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.school, color: AppColors.secondary, size: 24),
                   const SizedBox(width: 8),
@@ -690,6 +703,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               Wrap(
                 spacing: 16,
+                runSpacing: 8,
                 children: [
                   InkWell(
                     onTap: () => context.go('/courses'),
@@ -708,8 +722,11 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
                 '© 2026 EduSphere Inc. All rights reserved.',

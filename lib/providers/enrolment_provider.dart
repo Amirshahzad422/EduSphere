@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import '../models/course_model.dart';
 import '../models/enrolment_model.dart';
 import '../services/course_service.dart';
+import '../services/certificate_service.dart';
 import 'auth_provider.dart';
 import 'course_provider.dart';
 
@@ -214,6 +215,24 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
       final user = _ref?.read(authProvider);
       if (user != null) {
         _courseService.recordCourseRating(courseId, 5.0).catchError((_) {});
+        try {
+          final certService = _ref?.read(certificateServiceProvider);
+          if (certService != null) {
+            unawaited(
+              certService.generateCertificate(
+                userId: user.id,
+                userName: user.name,
+                courseId: courseId,
+                courseTitle: courseTitle ?? 'Masterclass Course',
+                instructorName: instructorName ?? 'EduSphere Instructor',
+              ).then((_) {}).catchError((err) {
+                debugPrint('[EnrolmentNotifier] Auto-certificate generation error: $err');
+              }),
+            );
+          }
+        } catch (e) {
+          debugPrint('[EnrolmentNotifier] Could not trigger certificate generation: $e');
+        }
       }
     }
 

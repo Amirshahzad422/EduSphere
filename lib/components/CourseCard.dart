@@ -4,6 +4,7 @@ import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
 import '../utils/formatters.dart';
+import '../utils/helpers.dart';
 
 /// Standard Grid Course Card matching Stitch designs & AGENTS.md requirements
 class CourseCard extends StatelessWidget {
@@ -47,15 +48,10 @@ class CourseCard extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: Image.network(
-                    course.thumbnailUrl,
+                  child: AppHelpers.buildCachedImage(
+                    imageUrl: course.thumbnailUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: AppColors.surfaceContainerHigh,
-                      child: const Center(
-                        child: Icon(Icons.image, size: 40, color: AppColors.outline),
-                      ),
-                    ),
+                    memCacheWidth: 600,
                   ),
                 ),
                 // Category Chip (Top Left)
@@ -289,6 +285,10 @@ class CourseListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 450;
+    final thumbWidth = isMobile ? 110.0 : 140.0;
+    final thumbHeight = isMobile ? 80.0 : 95.0;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -306,7 +306,7 @@ class CourseListCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -316,17 +316,14 @@ class CourseListCard extends StatelessWidget {
                   ClipRRect(
                     borderRadius: AppSpacing.roundedMd,
                     child: SizedBox(
-                      width: 140,
-                      height: 95,
-                      child: Image.network(
-                        course.thumbnailUrl,
+                      width: thumbWidth,
+                      height: thumbHeight,
+                      child: AppHelpers.buildCachedImage(
+                        imageUrl: course.thumbnailUrl,
+                        width: thumbWidth,
+                        height: thumbHeight,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: AppColors.surfaceContainerHigh,
-                          child: const Center(
-                            child: Icon(Icons.image, size: 30, color: AppColors.outline),
-                          ),
-                        ),
+                        memCacheWidth: 350,
                       ),
                     ),
                   ),
@@ -352,7 +349,7 @@ class CourseListCard extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
 
               // Main Details
               Expanded(
@@ -362,16 +359,20 @@ class CourseListCard extends StatelessWidget {
                     // Category & Level
                     Row(
                       children: [
-                        Text(
-                          course.category,
-                          style: AppTypography.labelSmall.copyWith(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            course.category,
+                            style: AppTypography.labelSmall.copyWith(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text('•', style: TextStyle(color: AppColors.outline, fontSize: 10)),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
                           course.level,
                           style: AppTypography.labelSmall.copyWith(
@@ -403,7 +404,7 @@ class CourseListCard extends StatelessWidget {
                     // Title
                     Text(
                       course.title,
-                      style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                      style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800, fontSize: isMobile ? 13.5 : 15),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -412,30 +413,37 @@ class CourseListCard extends StatelessWidget {
                     // Instructor name
                     Text(
                       'By ${course.instructor.name} • ${course.duration}',
-                      style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
+                      style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // Rating & Price row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
-                            const SizedBox(width: 3),
+                            const Icon(Icons.star_rounded, size: 15, color: AppColors.star),
+                            const SizedBox(width: 2),
                             Text(
                               course.rating.toStringAsFixed(1),
                               style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '(${AppFormatters.formatCount(course.enrolmentCount)} students)',
-                              style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.outline),
+                              '(${AppFormatters.formatCount(course.enrolmentCount)})',
+                              style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.outline),
                             ),
                           ],
                         ),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             if (course.originalPrice != null) ...[
                               Text(
@@ -443,14 +451,14 @@ class CourseListCard extends StatelessWidget {
                                 style: AppTypography.bodySmall.copyWith(
                                   decoration: TextDecoration.lineThrough,
                                   color: AppColors.outline,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                             ],
                             Text(
                               course.price == 0 ? 'Free' : AppFormatters.formatCurrency(course.price),
-                              style: AppTypography.titleMedium.copyWith(
+                              style: AppTypography.titleSmall.copyWith(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.secondary,
                               ),

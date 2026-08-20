@@ -111,8 +111,10 @@ class InstructorDashboardScreen extends ConsumerWidget {
                           ),
                           onPressed: () {
                             ref.read(authProvider.notifier).switchRole(UserRole.student);
-                            AppHelpers.showSnackBar(context, 'Switched to Student View');
-                            context.go('/home');
+                            if (context.mounted) {
+                              AppHelpers.showSnackBar(context, 'Switched to Student View');
+                              context.go('/home');
+                            }
                           },
                         ),
                         AppButton(
@@ -189,8 +191,10 @@ class InstructorDashboardScreen extends ConsumerWidget {
                           ),
                           onPressed: () {
                             ref.read(authProvider.notifier).switchRole(UserRole.student);
-                            AppHelpers.showSnackBar(context, 'Switched to Student View');
-                            context.go('/home');
+                            if (context.mounted) {
+                              AppHelpers.showSnackBar(context, 'Switched to Student View');
+                              context.go('/home');
+                            }
                           },
                         ),
                         AppButton(
@@ -362,12 +366,16 @@ class InstructorDashboardScreen extends ConsumerWidget {
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                 leading: ClipRRect(
                                   borderRadius: AppSpacing.roundedSm,
-                                  child: Image.network(
-                                    course.thumbnailUrl,
+                                  child: SizedBox(
                                     width: 64,
                                     height: 44,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(width: 64, height: 44, color: AppColors.surfaceContainerLow),
+                                    child: AppHelpers.buildCachedImage(
+                                      imageUrl: course.thumbnailUrl,
+                                      width: 64,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: 150,
+                                    ),
                                   ),
                                 ),
                                 title: Text(
@@ -386,14 +394,25 @@ class InstructorDashboardScreen extends ConsumerWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.secondary),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
                                       tooltip: 'Edit in Builder',
                                       onPressed: () => context.go('/builder?courseId=${course.id}'),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.visibility_outlined, size: 20, color: AppColors.outline),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.outline),
                                       tooltip: 'View Course Page',
                                       onPressed: () => context.go('/course/${course.id}'),
+                                    ),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                      tooltip: 'Delete Course Permanently',
+                                      onPressed: () => _showDeleteCourseDialog(context, ref, course, user?.id),
                                     ),
                                   ],
                                 ),
@@ -438,10 +457,13 @@ class InstructorDashboardScreen extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Recent Student Reviews & Feedback',
-              style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+            Expanded(
+              child: Text(
+                'Recent Student Reviews & Feedback',
+                style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -449,6 +471,7 @@ class InstructorDashboardScreen extends ConsumerWidget {
                 borderRadius: AppSpacing.roundedSm,
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.bolt, size: 14, color: AppColors.success),
                   const SizedBox(width: 4),
@@ -603,6 +626,120 @@ class InstructorDashboardScreen extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Double-confirmation dialog to permanently delete a course and purge its Cloudinary assets
+  Future<void> _showDeleteCourseDialog(
+    BuildContext context,
+    WidgetRef ref,
+    CourseModel course,
+    String? userId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.12),
+                borderRadius: AppSpacing.roundedSm,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Delete Course Permanently?',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurface),
+                children: [
+                  const TextSpan(text: 'Are you sure you want to permanently delete '),
+                  TextSpan(
+                    text: '"${course.title}"',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                  const TextSpan(text: '?'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppSpacing.roundedMd,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ This action is permanent and irreversible:',
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.error, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '• All video lessons will be purged from Cloudinary storage console.\n'
+                    '• All downloadable PDFs, blueprints & resources will be deleted.\n'
+                    '• Quizzes, reviews, and live class schedules will be erased.\n'
+                    '• Course will be permanently removed from database and search.',
+                    style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 12, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedSm),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Delete Course Forever', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      AppHelpers.showSnackBar(context, 'Deleting course and purging Cloudinary console assets...');
+
+      final courseService = ref.read(courseServiceProvider);
+      await courseService.deleteCourse(course.id, userId: userId);
+
+      // Refresh providers
+      ref.read(courseRefreshCounterProvider.notifier).state++;
+      ref.invalidate(allCoursesProvider);
+
+      if (context.mounted) {
+        AppHelpers.showSnackBar(
+          context,
+          '✅ Course "${course.title}" and all Cloudinary assets permanently deleted.',
+        );
+      }
+    }
   }
 }
 

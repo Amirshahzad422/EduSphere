@@ -86,4 +86,31 @@ class QuizService {
   Future<List<QuizAttemptModel>> getAttemptsForUser(String userId) async {
     return _localAttempts.where((a) => a.userId == userId).toList();
   }
+
+  /// Persists or updates a quiz definition in Cloud Firestore collection 'quizzes'
+  Future<QuizModel> saveOrUpdateQuiz(QuizModel quiz) async {
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        final firestore = FirebaseFirestore.instance;
+        await firestore.collection('quizzes').doc(quiz.id).set(quiz.toJson(), SetOptions(merge: true));
+        debugPrint('[QuizService] 💾 Persisted quiz ${quiz.id} ("${quiz.title}") to Firestore.');
+      }
+    } catch (e) {
+      debugPrint('[QuizService] Local quiz mode (Firestore sync: $e)');
+    }
+    return quiz;
+  }
+
+  /// Deletes a quiz definition from Cloud Firestore collection 'quizzes'
+  Future<void> deleteQuiz(String quizId) async {
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        final firestore = FirebaseFirestore.instance;
+        await firestore.collection('quizzes').doc(quizId).delete();
+        debugPrint('[QuizService] 🗑️ Deleted quiz $quizId from Firestore.');
+      }
+    } catch (e) {
+      debugPrint('[QuizService] Delete quiz note (Firestore sync: $e)');
+    }
+  }
 }

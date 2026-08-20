@@ -410,7 +410,7 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
 
           // Bottom Meeting Controls
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             decoration: const BoxDecoration(
               color: Color(0xFF0F172A),
             ),
@@ -418,34 +418,45 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Mic Toggle
                     IconButton(
-                      icon: Icon(widget.isMicOn ? Icons.mic : Icons.mic_off, color: Colors.white),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: Icon(widget.isMicOn ? Icons.mic : Icons.mic_off, color: Colors.white, size: 18),
                       onPressed: _handleToggleMic,
                       style: IconButton.styleFrom(
                         backgroundColor: widget.isMicOn ? AppColors.secondary : AppColors.error,
                       ),
                       tooltip: widget.isMicOn ? 'Mute Microphone' : 'Unmute Microphone',
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // Camera Toggle
                     IconButton(
-                      icon: Icon(widget.isCameraOn ? Icons.videocam : Icons.videocam_off, color: Colors.white),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: Icon(widget.isCameraOn ? Icons.videocam : Icons.videocam_off, color: Colors.white, size: 18),
                       onPressed: _handleToggleCamera,
                       style: IconButton.styleFrom(
                         backgroundColor: widget.isCameraOn ? AppColors.secondary : AppColors.error,
                       ),
                       tooltip: widget.isCameraOn ? 'Turn Off Camera' : 'Turn On Camera',
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // Screen Share
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       icon: Icon(
                         _isScreenSharing ? Icons.screen_share : Icons.screen_share_outlined,
                         color: _isScreenSharing ? AppColors.secondaryFixed : Colors.white,
+                        size: 18,
                       ),
                       onPressed: _handleScreenShare,
                       style: IconButton.styleFrom(
@@ -453,14 +464,18 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                       ),
                       tooltip: 'Share Screen',
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // Raise Hand
                     if (!widget.isInstructor)
                       IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         icon: Icon(
                           Icons.front_hand,
                           color: widget.isHandRaised ? AppColors.secondaryFixed : Colors.white,
+                          size: 18,
                         ),
                         onPressed: widget.onToggleHandRaise != null
                             ? () => widget.onToggleHandRaise!(!widget.isHandRaised)
@@ -474,21 +489,28 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                 ),
 
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Chat Toggle
                     IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 18),
                       onPressed: widget.onToggleChat,
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.white12,
                       ),
                       tooltip: 'Live Class Chat',
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
 
                     // End / Leave Call
                     IconButton(
-                      icon: const Icon(Icons.call_end, color: Colors.white),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: const Icon(Icons.call_end, color: Colors.white, size: 18),
                       onPressed: widget.onLeaveClass,
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.error,

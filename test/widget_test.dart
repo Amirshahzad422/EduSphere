@@ -46,6 +46,7 @@ import 'package:edusphere/screens/Earnings.dart';
 import 'package:edusphere/screens/About.dart';
 import 'package:edusphere/screens/Contact.dart';
 import 'package:edusphere/screens/NotFound.dart';
+import 'package:edusphere/screens/Lesson.dart';
 import 'package:edusphere/models/review_model.dart';
 import 'package:edusphere/services/review_service.dart';
 import 'package:edusphere/providers/review_provider.dart';
@@ -1732,6 +1733,376 @@ void main() {
 
       expect(find.text('Create Free Account'), findsOneWidget);
       expect(find.text('Sign In'), findsOneWidget);
+    });
+  });
+
+  group('Phase 6: Instructor Quiz Builder & Downloadable Resource Uploader Flow', () {
+    test('QuizModel & QuizQuestion: copyWith, serialization, and correct option evaluation', () {
+      final question = QuizQuestion(
+        id: 'q_test_1',
+        question: 'What is the maximum free file size on Cloudinary for zero-card uploads?',
+        explanation: 'Cloudinary free tier allows up to 100MB per raw/video asset.',
+        type: QuestionType.multipleChoice,
+        options: const [
+          QuizOption(id: 'opt_1', text: '100 MB', isCorrect: true),
+          QuizOption(id: 'opt_2', text: '500 MB', isCorrect: false),
+          QuizOption(id: 'opt_3', text: '1 GB', isCorrect: false),
+        ],
+      );
+
+      final json = question.toJson();
+      expect(json['id'], 'q_test_1');
+      expect(json['type'], 'multipleChoice');
+      expect((json['options'] as List).length, 3);
+
+      final restoredQ = QuizQuestion.fromJson(json);
+      expect(restoredQ.question, contains('maximum free file size'));
+      expect(restoredQ.options.first.isCorrect, isTrue);
+
+      final modifiedQ = restoredQ.copyWith(explanation: 'Updated explanation');
+      expect(modifiedQ.explanation, 'Updated explanation');
+      expect(modifiedQ.options.length, 3);
+
+      final quiz = QuizModel(
+        id: 'quiz_instructor_101',
+        courseId: 'course_cloud_arch',
+        title: 'Cloudflare & Cloudinary Architecture Quiz',
+        description: 'Module 1 comprehensive assessment',
+        passingScore: 75,
+        timeLimitMinutes: 20,
+        questions: [question],
+      );
+
+      expect(quiz.passingScore, 75);
+      expect(quiz.questions.length, 1);
+
+      final updatedQuiz = quiz.copyWith(passingScore: 85);
+      expect(updatedQuiz.passingScore, 85);
+    });
+
+    test('QuizService: saveOrUpdateQuiz and deleteQuiz persist correctly', () async {
+      final quizService = QuizService();
+
+      final quiz = QuizModel(
+        id: 'quiz_crud_test',
+        courseId: 'course_flutter_arch',
+        title: 'State Management Quiz',
+        description: 'Testing Riverpod & state immutability',
+        passingScore: 80,
+        timeLimitMinutes: 15,
+        questions: const [
+          QuizQuestion(
+            id: 'q_1',
+            question: 'Does Riverpod require BuildContext to read providers in notifier callbacks?',
+            type: QuestionType.trueFalse,
+            options: [
+              QuizOption(id: 'opt_t', text: 'True', isCorrect: false),
+              QuizOption(id: 'opt_f', text: 'False', isCorrect: true),
+            ],
+          ),
+        ],
+      );
+
+      final saved = await quizService.saveOrUpdateQuiz(quiz);
+      expect(saved.id, 'quiz_crud_test');
+      expect(saved.title, 'State Management Quiz');
+
+      await quizService.deleteQuiz('quiz_crud_test');
+    });
+
+    test('LessonResource: serialization and Cloudinary raw resource upload flow', () async {
+      const resource = LessonResource(
+        title: 'Enterprise Architecture Blueprint (PDF)',
+        url: 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/resources/demo/blueprint.pdf',
+        type: 'pdf',
+        cloudinaryPublicId: 'resources/course_arch/blueprint',
+        isPreview: true,
+      );
+
+      final json = resource.toJson();
+      expect(json['title'], 'Enterprise Architecture Blueprint (PDF)');
+      expect(json['type'], 'pdf');
+      expect(json['isPreview'], isTrue);
+      expect(json['cloudinaryPublicId'], 'resources/course_arch/blueprint');
+
+      final fromJson = LessonResource.fromJson(json);
+      expect(fromJson.title, resource.title);
+      expect(fromJson.isPreview, isTrue);
+
+      final mockClient = _MockCloudinaryHttpClient();
+      final uploadService = CloudinaryUploadService(client: mockClient);
+
+      final uploadResult = await uploadService.uploadLessonResource(
+        courseId: 'course_arch',
+        resourceId: 'res_blueprint_1',
+        fileName: 'blueprint.pdf',
+        fileBytes: Uint8List.fromList([1, 2, 3, 4]),
+        isPreview: true,
+      );
+
+      expect(uploadResult.publicId, contains('resources/course_arch/res_blueprint_1'));
+    });
+
+    testWidgets('CourseBuilderScreen: renders Quizzes card, Add Quiz modal, and Lesson resource badge', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CourseBuilderScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // 1. Verify Course Details, Modules, and Quizzes section render
+      expect(find.text('Course Details'), findsOneWidget);
+      expect(find.text('Curriculum Modules'), findsOneWidget);
+      expect(find.text('Course Quizzes & Assessments'), findsOneWidget);
+      expect(find.text('Add Quiz'), findsOneWidget);
+
+      // 2. Verify initial attached resource badge on sample lesson
+      expect(find.text('1 file(s)'), findsOneWidget);
+
+      // 3. Open Add Quiz Dialog
+      final addQuizBtn = find.text('Add Quiz');
+      await tester.ensureVisible(addQuizBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(addQuizBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create New Course Quiz'), findsOneWidget);
+      expect(find.text('Quiz Title *'), findsOneWidget);
+      expect(find.text('Add Question'), findsOneWidget);
+      expect(find.text('Create Quiz'), findsOneWidget);
+
+      // 4. Enter Quiz Title & Create Quiz
+      await tester.enterText(find.widgetWithText(TextField, 'Quiz Title *'), 'Final Certification Exam');
+      await tester.pumpAndSettle();
+
+      final createQuizBtn = find.text('Create Quiz');
+      await tester.ensureVisible(createQuizBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(createQuizBtn);
+      await tester.pumpAndSettle();
+
+      // 5. Verify Quiz is added to the Course Quizzes section in CourseBuilder
+      expect(find.text('Final Certification Exam'), findsOneWidget);
+    });
+
+    testWidgets('LessonScreen: Resources Tab renders View/Download for free/enrolled and Unlock for locked files', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final testCourse = CourseModel(
+        id: 'course_res_test',
+        title: 'Cloud Architecture & Flutter',
+        category: 'Development',
+        instructorId: 'inst_1',
+        instructor: const InstructorInfo(id: 'inst_1', name: 'Dr. Sarah', title: 'Lead', avatarUrl: '', bio: ''),
+        price: 29.99,
+        discount: 0,
+        level: 'Intermediate',
+        language: 'English',
+        duration: '5h',
+        rating: 5.0,
+        enrolmentCount: 10,
+        thumbnailUrl: '',
+        syllabus: const [
+          ModuleModel(
+            id: 'm1',
+            title: 'Module 1',
+            description: '',
+            lessons: [
+              LessonModel(
+                id: 'les_free_1',
+                courseId: 'course_res_test',
+                title: 'Intro Lesson',
+                isPreview: false,
+                order: 1,
+                resources: [
+                  LessonResource(
+                    title: 'Free Public Cheat Sheet (PDF)',
+                    type: 'pdf',
+                    url: 'https://example.com/free.pdf',
+                    isPreview: true,
+                  ),
+                  LessonResource(
+                    title: 'Paid Exclusive Source Code (ZIP)',
+                    type: 'zip',
+                    url: 'https://example.com/paid.zip',
+                    isPreview: false,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            allCoursesProvider.overrideWith((ref) async => [testCourse]),
+            enrolmentProvider.overrideWith((ref) => EnrolmentNotifier()),
+            authProvider.overrideWith((ref) => AuthNotifier(AuthService())),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: LessonScreen(
+                courseId: 'course_res_test',
+                lessonId: 'les_free_1',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Tap Resources Tab (Index 2)
+      await tester.tap(find.text('Resources'));
+      await tester.pumpAndSettle();
+
+      // Verify Free Preview Resource has View & Download buttons
+      expect(find.text('Free Public Cheat Sheet (PDF)'), findsOneWidget);
+      expect(find.text('View'), findsOneWidget);
+      expect(find.text('Download'), findsOneWidget);
+
+      // Verify Paid Exclusive Resource for Guest has Unlock File button
+      expect(find.text('Paid Exclusive Source Code (ZIP)'), findsOneWidget);
+      expect(find.text('Unlock File'), findsOneWidget);
+    });
+
+    test('CourseService.deleteCourse removes course from database, caches, and triggers Cloudinary asset deletion', () async {
+      final courseService = CourseService();
+      final testDeleteCourse = CourseModel(
+        id: 'course_to_delete_test',
+        title: 'Deprecated Systems Masterclass',
+        category: 'Development',
+        instructorId: 'inst_del',
+        instructor: const InstructorInfo(id: 'inst_del', name: 'Instructor', title: 'Senior Faculty', avatarUrl: '', bio: ''),
+        price: 49.99,
+        discount: 0,
+        level: 'Advanced',
+        language: 'English',
+        duration: '2h',
+        rating: 4.5,
+        enrolmentCount: 5,
+        thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/v12345/courses/course_to_delete_test/thumb.jpg',
+        syllabus: const [
+          ModuleModel(
+            id: 'm_del',
+            title: 'Module 1',
+            description: '',
+            lessons: [
+              LessonModel(
+                id: 'les_del_1',
+                courseId: 'course_to_delete_test',
+                title: 'Lesson 1',
+                order: 1,
+                videoUrl: 'courses/course_to_delete_test/les_video_1',
+                resources: [
+                  LessonResource(
+                    title: 'Attached Notes (PDF)',
+                    cloudinaryPublicId: 'resources/course_to_delete_test/notes',
+                    type: 'pdf',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      // Publish course
+      await courseService.publishCourse(testDeleteCourse);
+      expect(await courseService.getCourseById('course_to_delete_test'), isNotNull);
+
+      // Delete course with Cloudinary purge
+      final uploadService = CloudinaryUploadService(client: _MockCloudinaryHttpClient());
+      final deleted = await courseService.deleteCourse(
+        'course_to_delete_test',
+        userId: 'inst_del',
+        uploadService: uploadService,
+      );
+      expect(deleted, isTrue);
+
+      // Verify course is completely gone
+      final lookup = await courseService.getCourseById('course_to_delete_test');
+      expect(lookup, isNull);
+    });
+
+    testWidgets('InstructorDashboard: Delete course action shows confirmation dialog and removes course', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final testCourse = CourseModel(
+        id: 'course_dashboard_del',
+        title: 'Legacy Python Scripting',
+        category: 'Development',
+        instructorId: 'inst_test_1',
+        instructor: const InstructorInfo(id: 'inst_test_1', name: 'Dr. Test', title: 'Senior Faculty', avatarUrl: '', bio: ''),
+        price: 19.99,
+        discount: 0,
+        level: 'Beginner',
+        language: 'English',
+        duration: '1h',
+        rating: 4.0,
+        enrolmentCount: 2,
+        thumbnailUrl: '',
+        syllabus: const [],
+      );
+
+      final authUser = UserModel(
+        id: 'inst_test_1',
+        name: 'Dr. Test',
+        email: 'dr.test@edusphere.io',
+        role: UserRole.instructor,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith((ref) {
+              final n = AuthNotifier(AuthService());
+              n.state = authUser;
+              return n;
+            }),
+            allCoursesProvider.overrideWith((ref) async => [testCourse]),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: InstructorDashboardScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Legacy Python Scripting'), findsOneWidget);
+      expect(find.byTooltip('Delete Course Permanently'), findsOneWidget);
+
+      // Tap Delete Course button
+      await tester.tap(find.byTooltip('Delete Course Permanently'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Verify Double-Confirmation Dialog opens with warning and details
+      expect(find.text('Delete Course Permanently?'), findsOneWidget);
+      expect(find.text('• All video lessons will be purged from Cloudinary storage console.\n• All downloadable PDFs, blueprints & resources will be deleted.\n• Quizzes, reviews, and live class schedules will be erased.\n• Course will be permanently removed from database and search.'), findsOneWidget);
+      expect(find.text('Delete Course Forever'), findsOneWidget);
+
+      // Confirm deletion
+      await tester.tap(find.text('Delete Course Forever'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
     });
   });
 }

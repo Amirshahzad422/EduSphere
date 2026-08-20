@@ -60,6 +60,14 @@ class CertificateService {
         if (data['certificate'] != null) {
           final cert = CertificateModel.fromJson(Map<String, dynamic>.from(data['certificate']));
           debugPrint('[CertificateService] ✅ Cloudflare Worker generated certificate: ${cert.verificationId}');
+          try {
+            if (Firebase.apps.isNotEmpty) {
+              await FirebaseFirestore.instance
+                  .collection('certificates')
+                  .doc(cert.verificationId)
+                  .set(cert.toJson(), SetOptions(merge: true));
+            }
+          } catch (_) {}
           return cert;
         }
       }
@@ -87,7 +95,7 @@ class CertificateService {
         await FirebaseFirestore.instance
             .collection('certificates')
             .doc(fallbackVerificationId)
-            .set(localCert.toJson());
+            .set(localCert.toJson(), SetOptions(merge: true));
       }
     } catch (_) {}
 

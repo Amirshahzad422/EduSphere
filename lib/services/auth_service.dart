@@ -387,17 +387,19 @@ class AuthService {
           .limit(25)
           .snapshots()
           .map((snapshot) {
-        return snapshot.docs
-            .map((doc) {
-              final data = doc.data();
-              final docId = (data['id'] != null && data['id'].toString().isNotEmpty) ? data['id'].toString() : doc.id;
-              return UserModel.fromJson({
-                ...data,
-                'id': docId,
-              });
-            })
-            .where((u) => u.name.trim().isNotEmpty && u.id.trim().isNotEmpty && !u.id.startsWith('google_user_'))
-            .toList();
+        final Map<String, UserModel> uniqueMap = {};
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final docId = (data['id'] != null && data['id'].toString().isNotEmpty) ? data['id'].toString() : doc.id;
+          final user = UserModel.fromJson({
+            ...data,
+            'id': docId,
+          });
+          if (user.name.trim().isNotEmpty && user.id.trim().isNotEmpty && !user.id.startsWith('google_user_')) {
+            uniqueMap[user.id.trim()] = user;
+          }
+        }
+        return uniqueMap.values.toList();
       });
     }
     return Stream.value(_localUser != null ? [_localUser!] : []);

@@ -61,13 +61,13 @@ CustomTransitionPage<void> _buildFadeSlidePage({
   return CustomTransitionPage<void>(
     key: key,
     child: child,
-    transitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 120),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn);
       return FadeTransition(
         opacity: curvedAnimation,
         child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero).animate(curvedAnimation),
+          position: Tween<Offset>(begin: const Offset(0.01, 0), end: Offset.zero).animate(curvedAnimation),
           child: child,
         ),
       );

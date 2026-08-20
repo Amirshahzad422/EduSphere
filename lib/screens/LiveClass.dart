@@ -131,33 +131,44 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
               ? 'Ending this class will disconnect all connected students and archive the live stream session.'
               : 'You can rejoin this active lecture at any time from My Learning while it remains live.',
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Stay in Class'),
-          ),
-          AppButton(
-            label: isInstructor ? 'End Class' : 'Leave',
-            variant: ButtonVariant.danger,
-            size: ButtonSize.sm,
-            onPressed: () async {
-              Navigator.pop(ctx);
-              stopHardwareMediaStream();
-              if (isInstructor) {
-                await ref.read(liveClassServiceProvider).endLiveClass(widget.classId);
-                ref.invalidate(allLiveClassesStreamProvider);
-                ref.invalidate(activeLiveClassStreamProvider(widget.classId));
-                if (mounted) context.go('/instructor/live-classes');
-              } else {
-                final user = ref.read(authProvider);
-                if (user != null) {
-                  await ref.read(liveClassServiceProvider).leaveLiveClass(widget.classId, user.id);
-                }
-                ref.invalidate(allLiveClassesStreamProvider);
-                ref.invalidate(activeLiveClassStreamProvider(widget.classId));
-                if (mounted) context.go('/my-learning');
-              }
-            },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                child: const Text('Stay in Class'),
+              ),
+              const SizedBox(width: 8),
+              AppButton(
+                label: isInstructor ? 'End Class' : 'Leave',
+                variant: ButtonVariant.danger,
+                size: ButtonSize.sm,
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  stopHardwareMediaStream();
+                  if (isInstructor) {
+                    await ref.read(liveClassServiceProvider).endLiveClass(widget.classId);
+                    ref.invalidate(allLiveClassesStreamProvider);
+                    ref.invalidate(activeLiveClassStreamProvider(widget.classId));
+                    if (mounted) context.go('/instructor/live-classes');
+                  } else {
+                    final user = ref.read(authProvider);
+                    if (user != null) {
+                      await ref.read(liveClassServiceProvider).leaveLiveClass(widget.classId, user.id);
+                    }
+                    ref.invalidate(allLiveClassesStreamProvider);
+                    ref.invalidate(activeLiveClassStreamProvider(widget.classId));
+                    if (mounted) context.go('/my-learning');
+                  }
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -361,8 +372,11 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top Breadcrumb & Notification Trigger Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
                         onTap: () => context.go(isInstructor ? '/instructor/live-classes' : '/my-learning'),

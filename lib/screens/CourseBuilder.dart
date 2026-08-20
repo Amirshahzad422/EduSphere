@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/course_model.dart';
 import '../models/lesson_model.dart';
+import '../models/quiz_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/course_provider.dart';
+import '../services/quiz_service.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
@@ -33,6 +35,7 @@ class _DraftLesson {
   String cloudinaryPublicId;
   String videoUrl;
   bool isPreview;
+  List<LessonResource> resources;
 
   _DraftLesson({
     required this.id,
@@ -41,7 +44,8 @@ class _DraftLesson {
     this.cloudinaryPublicId = '',
     this.videoUrl = '',
     this.isPreview = false,
-  });
+    List<LessonResource>? resources,
+  }) : resources = resources ?? [];
 }
 
 class _DraftModule {
@@ -75,6 +79,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
   bool _isLoadingCourse = false;
   bool _isEditMode = false;
   final _uploadService = CloudinaryUploadService();
+  final _quizService = QuizService();
 
   final List<_DraftModule> _modules = [
     _DraftModule(
@@ -89,18 +94,29 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
           cloudinaryPublicId: 'courses/demo/intro_teaser',
           videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
           isPreview: true,
+          resources: [
+            const LessonResource(
+              title: 'Curriculum Roadmap (PDF)',
+              cloudinaryPublicId: 'resources/demo/curriculum_roadmap',
+              type: 'pdf',
+              isPreview: true,
+            ),
+          ],
         ),
         _DraftLesson(
           id: 'les_1_2',
           title: 'Zero-Card Cloud Architecture with Cloudinary',
           duration: '22m',
           cloudinaryPublicId: 'courses/demo/c1_arch_deep_dive',
-          videoUrl: '', // Non-preview: NO playable raw URL stored
+          videoUrl: '',
           isPreview: false,
+          resources: [],
         ),
       ],
     ),
   ];
+
+  final List<QuizModel> _quizzes = [];
 
   @override
   void initState() {
@@ -137,11 +153,14 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                         cloudinaryPublicId: l.cloudinaryPublicId ?? '',
                         videoUrl: l.videoUrl,
                         isPreview: l.isPreview,
+                        resources: List<LessonResource>.from(l.resources),
                       ))
                   .toList(),
             ),
           );
         }
+        _quizzes.clear();
+        _quizzes.addAll(course.quizzes);
         _isLoadingCourse = false;
       });
     } else {
@@ -231,7 +250,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
 
                 setState(() {
                   if (isEditing) {
-                    // Update only module title & description, strictly preserving all lessons & IDs
                     existingMod!.title = title;
                     existingMod.description = descCtrl.text.trim();
                   } else {
@@ -264,6 +282,17 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
     final lesson = _modules[modIdx].lessons[lesIdx];
     final publicId = lesson.cloudinaryPublicId;
 
+    // Delete remote resources
+    for (final res in lesson.resources) {
+      if (res.cloudinaryPublicId != null && res.cloudinaryPublicId!.isNotEmpty) {
+        await _uploadService.deleteCloudinaryAsset(
+          publicId: res.cloudinaryPublicId!,
+          courseId: widget.courseId,
+          resourceType: 'raw',
+        );
+      }
+    }
+
     setState(() {
       _modules[modIdx].lessons.removeAt(lesIdx);
     });
@@ -281,6 +310,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
     }
   }
 
+  /// Modal for adding/editing a lesson with real Video and Resource Uploader
   Future<void> _showAddOrEditLessonModal(int moduleIndex, {int? lessonIndex}) async {
     final isEditing = lessonIndex != null;
     final existingLes = isEditing ? _modules[moduleIndex].lessons[lessonIndex] : null;
@@ -288,15 +318,22 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
     final lessonTitleCtrl = TextEditingController(text: existingLes?.title ?? 'New Lecture Video');
     final durationCtrl = TextEditingController(text: existingLes?.duration ?? '15m');
     bool isPreview = existingLes?.isPreview ?? false;
-    bool isUploading = false;
-    double uploadProgress = 0.0;
-    String uploadStatusText = '';
+    bool isUploadingVideo = false;
+    double videoProgress = 0.0;
+    String videoStatusText = '';
     String uploadedPublicId = existingLes?.cloudinaryPublicId ?? '';
     String uploadedSecureUrl = existingLes?.videoUrl ?? '';
     final String oldPublicId = existingLes?.cloudinaryPublicId ?? '';
-    String? selectedFileName;
-    int? selectedFileSize;
-    String? uploadErrorMessage;
+    String? selectedVideoFileName;
+    int? selectedVideoFileSize;
+    String? videoUploadErrorMessage;
+
+    // Downloadable Resources state
+    final List<LessonResource> draftResources = List<LessonResource>.from(existingLes?.resources ?? []);
+    bool isUploadingResource = false;
+    double resourceProgress = 0.0;
+    String resourceStatusText = '';
+    String? resourceUploadErrorMessage;
 
     await showDialog(
       context: context,
@@ -304,7 +341,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
-            final canSaveLesson = uploadedPublicId.isNotEmpty && !isUploading;
+            final canSaveLesson = uploadedPublicId.isNotEmpty && !isUploadingVideo && !isUploadingResource;
 
             return AlertDialog(
               backgroundColor: Colors.white,
@@ -314,261 +351,446 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                   Icon(isEditing ? Icons.video_settings : Icons.video_library, color: AppColors.secondary),
                   const SizedBox(width: 10),
                   Text(
-                    isEditing ? 'Edit Lesson & Video' : 'Add Lesson & Upload Video',
+                    isEditing ? 'Edit Lesson & Content' : 'Add Lesson & Upload Content',
                     style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: lessonTitleCtrl,
-                      decoration: const InputDecoration(labelText: 'Lesson Title *'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: durationCtrl,
-                      decoration: const InputDecoration(labelText: 'Duration (e.g. 15m)'),
-                    ),
-                    const SizedBox(height: 14),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Free Preview Lesson'),
-                      subtitle: const Text('Allow guests to watch without enrolling'),
-                      value: isPreview,
-                      activeColor: AppColors.secondary,
-                      onChanged: isUploading
-                          ? null
-                          : (val) {
-                              setDialogState(() {
-                                isPreview = val;
-                                // Reset upload if access preset changes
-                                if (uploadedPublicId.isNotEmpty && uploadedPublicId != oldPublicId) {
-                                  uploadedPublicId = '';
-                                  uploadedSecureUrl = '';
-                                  selectedFileName = null;
-                                  selectedFileSize = null;
-                                }
-                              });
-                            },
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: AppSpacing.roundedMd,
-                        border: Border.all(color: AppColors.outlineVariant),
+              content: SizedBox(
+                width: 580,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Lesson Basic Info
+                      TextField(
+                        controller: lessonTitleCtrl,
+                        decoration: const InputDecoration(labelText: 'Lesson Title *'),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.cloud_upload_outlined, color: AppColors.secondary, size: 20),
-                              const SizedBox(width: 8),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: durationCtrl,
+                        decoration: const InputDecoration(labelText: 'Duration (e.g. 15m)'),
+                      ),
+                      const SizedBox(height: 14),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Free Preview Lesson'),
+                        subtitle: const Text('Allow guests to watch without enrolling'),
+                        value: isPreview,
+                        activeColor: AppColors.secondary,
+                        onChanged: isUploadingVideo
+                            ? null
+                            : (val) {
+                                setDialogState(() {
+                                  isPreview = val;
+                                  if (uploadedPublicId.isNotEmpty && uploadedPublicId != oldPublicId) {
+                                    uploadedPublicId = '';
+                                    uploadedSecureUrl = '';
+                                    selectedVideoFileName = null;
+                                    selectedVideoFileSize = null;
+                                  }
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 1. Lecture Video Upload Card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: AppSpacing.roundedMd,
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.cloud_upload_outlined, color: AppColors.secondary, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isEditing ? 'Lecture Video Stream' : 'Cloudinary Video Upload',
+                                  style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              isPreview
+                                  ? 'Preset: edusphere_public_preview (Locked: Public)'
+                                  : 'Preset: edusphere_authenticated (Locked: Authenticated)',
+                              style: AppTypography.bodySmall.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isPreview ? AppColors.secondary : AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (uploadedPublicId.isNotEmpty && selectedVideoFileName == null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Current Asset: $uploadedPublicId',
+                                        style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (selectedVideoFileName != null && uploadedPublicId.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.movie_outlined, size: 16, color: AppColors.secondary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '$selectedVideoFileName (${((selectedVideoFileSize ?? 0) / (1024 * 1024)).toStringAsFixed(1)} MB)',
+                                        style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (isUploadingVideo) ...[
+                              LinearProgressIndicator(
+                                value: videoProgress > 0 ? videoProgress : null,
+                                color: AppColors.secondary,
+                                backgroundColor: AppColors.surfaceContainerHigh,
+                              ),
+                              const SizedBox(height: 8),
                               Text(
-                                isEditing ? 'Replace Lecture Video' : 'Cloudinary Video Upload',
-                                style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                videoStatusText.isNotEmpty
+                                    ? videoStatusText
+                                    : 'Uploading: ${(videoProgress * 100).toStringAsFixed(0)}%',
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+                              ),
+                            ] else
+                              AppButton(
+                                label: videoUploadErrorMessage != null
+                                    ? 'Retry Video Upload'
+                                    : (uploadedPublicId.isNotEmpty ? 'Replace Video File' : 'Pick & Upload Video File'),
+                                variant: ButtonVariant.outline,
+                                size: ButtonSize.sm,
+                                icon: Icons.upload_file,
+                                isLoading: isUploadingVideo,
+                                onPressed: () async {
+                                  setDialogState(() {
+                                    videoUploadErrorMessage = null;
+                                  });
+
+                                  try {
+                                    final pickResult = await FilePicker.platform.pickFiles(
+                                      type: FileType.video,
+                                      withData: true,
+                                    );
+
+                                    if (pickResult == null || pickResult.files.isEmpty) return;
+
+                                    final pickedFile = pickResult.files.first;
+                                    final fileBytes = pickedFile.bytes;
+                                    final fileSize = pickedFile.size;
+                                    final fileName = pickedFile.name;
+
+                                    if (fileSize > CloudinaryUploadService.maxFileSizeBytes) {
+                                      final sizeMb = (fileSize / (1024 * 1024)).toStringAsFixed(1);
+                                      final err = 'Video file size ($sizeMb MB) exceeds the 100MB Cloudinary free tier limit.';
+                                      setDialogState(() {
+                                        selectedVideoFileName = null;
+                                        selectedVideoFileSize = null;
+                                        videoUploadErrorMessage = err;
+                                      });
+                                      if (mounted) AppHelpers.showSnackBar(context, err, isError: true);
+                                      return;
+                                    }
+
+                                    if (fileBytes == null) {
+                                      throw Exception('Unable to read video file bytes.');
+                                    }
+
+                                    setDialogState(() {
+                                      selectedVideoFileName = fileName;
+                                      selectedVideoFileSize = fileSize;
+                                      isUploadingVideo = true;
+                                      videoProgress = 0.05;
+                                      videoStatusText = 'Initiating upload to Cloudinary...';
+                                    });
+
+                                    final courseId = widget.courseId ?? 'course_${DateTime.now().millisecondsSinceEpoch}';
+                                    final lessonId = existingLes?.id ?? 'les_${DateTime.now().millisecondsSinceEpoch}';
+
+                                    final uploadResult = await _uploadService.uploadLessonVideo(
+                                      courseId: courseId,
+                                      lessonId: lessonId,
+                                      fileName: fileName,
+                                      fileBytes: fileBytes,
+                                      isPreview: isPreview,
+                                      onProgress: (progress, sent, total) {
+                                        setDialogState(() {
+                                          videoProgress = progress;
+                                          final sentMb = (sent / (1024 * 1024)).toStringAsFixed(1);
+                                          final totalMb = (total / (1024 * 1024)).toStringAsFixed(1);
+                                          videoStatusText = 'Uploading: ${(progress * 100).toStringAsFixed(0)}% ($sentMb MB / $totalMb MB)';
+                                        });
+                                      },
+                                    );
+
+                                    setDialogState(() {
+                                      isUploadingVideo = false;
+                                      uploadedPublicId = uploadResult.publicId;
+                                      uploadedSecureUrl = uploadResult.secureUrl;
+                                      if (uploadResult.durationSeconds > 0) {
+                                        final m = uploadResult.durationSeconds ~/ 60;
+                                        final s = uploadResult.durationSeconds % 60;
+                                        final autoDuration = '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+                                        durationCtrl.text = autoDuration;
+                                        videoStatusText = 'Video upload completed! ($autoDuration)';
+                                      } else {
+                                        videoStatusText = 'Video upload completed!';
+                                      }
+                                    });
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isUploadingVideo = false;
+                                      videoProgress = 0.0;
+                                      selectedVideoFileName = null;
+                                      selectedVideoFileSize = null;
+                                      videoUploadErrorMessage = e.toString();
+                                    });
+                                    if (mounted) AppHelpers.showSnackBar(context, 'Upload failed: $e', isError: true);
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 2. Downloadable Resources & PDFs Section
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLowest,
+                          borderRadius: AppSpacing.roundedMd,
+                          border: Border.all(color: AppColors.surfaceContainerHigh),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.attachment_rounded, color: AppColors.secondary, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Attached Lesson Resources',
+                                      style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  '${draftResources.length} files',
+                                  style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Students can view and download these files directly under the Resources tab.',
+                              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // List of attached resources
+                            if (draftResources.isNotEmpty)
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: draftResources.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (_, resIdx) {
+                                  final res = draftResources[resIdx];
+                                  final isPdf = res.type.toLowerCase() == 'pdf';
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: AppSpacing.roundedSm,
+                                      border: Border.all(color: AppColors.outlineVariant),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isPdf ? Icons.picture_as_pdf : Icons.insert_drive_file_outlined,
+                                          size: 20,
+                                          color: isPdf ? AppColors.error : AppColors.secondary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                res.title,
+                                                style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w600),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                res.isPreview ? 'Free Preview Access · Cloudinary Raw' : 'Enrolled Students Only · Signed Raw',
+                                                style: AppTypography.bodySmall.copyWith(fontSize: 10, color: res.isPreview ? AppColors.success : AppColors.primary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                          tooltip: 'Remove Resource',
+                                          onPressed: () async {
+                                            if (res.cloudinaryPublicId != null && res.cloudinaryPublicId!.isNotEmpty) {
+                                              _uploadService.deleteCloudinaryAsset(
+                                                publicId: res.cloudinaryPublicId!,
+                                                courseId: widget.courseId,
+                                                resourceType: 'raw',
+                                              );
+                                            }
+                                            setDialogState(() {
+                                              draftResources.removeAt(resIdx);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Text(
+                                  'No resource files attached to this lesson yet.',
+                                  style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+
+                            // Upload Resource Button & Progress
+                            if (isUploadingResource) ...[
+                              LinearProgressIndicator(
+                                value: resourceProgress > 0 ? resourceProgress : null,
+                                color: AppColors.secondary,
+                                backgroundColor: AppColors.surfaceContainerHigh,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                resourceStatusText,
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                              ),
+                            ] else
+                              AppButton(
+                                label: resourceUploadErrorMessage != null ? 'Retry Resource Upload' : 'Upload PDF / Resource File',
+                                variant: ButtonVariant.outline,
+                                size: ButtonSize.sm,
+                                icon: Icons.upload_file_outlined,
+                                onPressed: () async {
+                                  setDialogState(() {
+                                    resourceUploadErrorMessage = null;
+                                  });
+                                  try {
+                                    final pickResult = await FilePicker.platform.pickFiles(
+                                      type: FileType.custom,
+                                      allowedExtensions: ['pdf', 'zip', 'doc', 'docx', 'png', 'jpg', 'txt', 'epub'],
+                                      withData: true,
+                                    );
+
+                                    if (pickResult == null || pickResult.files.isEmpty) return;
+                                    final pickedFile = pickResult.files.first;
+                                    final fileBytes = pickedFile.bytes;
+                                    final fileName = pickedFile.name;
+                                    final extension = pickedFile.extension ?? 'pdf';
+
+                                    if (fileBytes == null) throw Exception('Unable to read resource file bytes.');
+
+                                    setDialogState(() {
+                                      isUploadingResource = true;
+                                      resourceProgress = 0.05;
+                                      resourceStatusText = 'Uploading $fileName to Cloudinary Raw Storage...';
+                                    });
+
+                                    final courseId = widget.courseId ?? 'course_${DateTime.now().millisecondsSinceEpoch}';
+                                    final resourceId = 'res_${DateTime.now().millisecondsSinceEpoch}';
+
+                                    final uploadResult = await _uploadService.uploadLessonResource(
+                                      courseId: courseId,
+                                      resourceId: resourceId,
+                                      fileName: fileName,
+                                      fileBytes: fileBytes,
+                                      isPreview: isPreview,
+                                      onProgress: (progress, sent, total) {
+                                        setDialogState(() {
+                                          resourceProgress = progress;
+                                          final sentMb = (sent / (1024 * 1024)).toStringAsFixed(1);
+                                          final totalMb = (total / (1024 * 1024)).toStringAsFixed(1);
+                                          resourceStatusText = 'Uploading: ${(progress * 100).toStringAsFixed(0)}% ($sentMb MB / $totalMb MB)';
+                                        });
+                                      },
+                                    );
+
+                                    setDialogState(() {
+                                      isUploadingResource = false;
+                                      draftResources.add(
+                                        LessonResource(
+                                          title: fileName,
+                                          url: uploadResult.secureUrl,
+                                          type: extension,
+                                          cloudinaryPublicId: uploadResult.publicId,
+                                          isPreview: isPreview,
+                                        ),
+                                      );
+                                      resourceStatusText = 'Resource uploaded successfully!';
+                                    });
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isUploadingResource = false;
+                                      resourceUploadErrorMessage = e.toString();
+                                    });
+                                    if (mounted) AppHelpers.showSnackBar(context, 'Resource upload failed: $e', isError: true);
+                                  }
+                                },
+                              ),
+                            if (resourceUploadErrorMessage != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                resourceUploadErrorMessage!,
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.error, fontSize: 11),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            isPreview
-                                ? 'Preset: edusphere_public_preview (Locked: Public)'
-                                : 'Preset: edusphere_authenticated (Locked: Authenticated)',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isPreview ? AppColors.secondary : AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (uploadedPublicId.isNotEmpty && selectedFileName == null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondary),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      'Current Asset: $uploadedPublicId',
-                                      style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w600),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (selectedFileName != null && uploadedPublicId.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.movie_outlined, size: 16, color: AppColors.secondary),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      '$selectedFileName (${((selectedFileSize ?? 0) / (1024 * 1024)).toStringAsFixed(1)} MB)',
-                                      style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w600),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (isUploading) ...[
-                            LinearProgressIndicator(
-                              value: uploadProgress > 0 ? uploadProgress : null,
-                              color: AppColors.secondary,
-                              backgroundColor: AppColors.surfaceContainerHigh,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              uploadStatusText.isNotEmpty
-                                  ? uploadStatusText
-                                  : 'Uploading: ${(uploadProgress * 100).toStringAsFixed(0)}%',
-                              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
-                            ),
-                          ] else
-                            AppButton(
-                              label: uploadErrorMessage != null
-                                  ? 'Retry Upload'
-                                  : (uploadedPublicId.isNotEmpty ? 'Replace Video File' : 'Pick & Upload Video File'),
-                              variant: ButtonVariant.outline,
-                              size: ButtonSize.sm,
-                              icon: Icons.upload_file,
-                              isLoading: isUploading,
-                              onPressed: () async {
-                                setDialogState(() {
-                                  uploadErrorMessage = null;
-                                });
-
-                                try {
-                                  final pickResult = await FilePicker.platform.pickFiles(
-                                    type: FileType.video,
-                                    withData: true,
-                                  );
-
-                                  if (pickResult == null || pickResult.files.isEmpty) {
-                                    return;
-                                  }
-
-                                  final pickedFile = pickResult.files.first;
-                                  final fileBytes = pickedFile.bytes;
-                                  final fileSize = pickedFile.size;
-                                  final fileName = pickedFile.name;
-
-                                  // Client-side 100MB hard limit check
-                                  if (fileSize > CloudinaryUploadService.maxFileSizeBytes) {
-                                    final sizeMb = (fileSize / (1024 * 1024)).toStringAsFixed(1);
-                                    final err = 'Video file size ($sizeMb MB) exceeds the 100MB Cloudinary free tier limit. Please compress or trim the video.';
-                                    setDialogState(() {
-                                      selectedFileName = null;
-                                      selectedFileSize = null;
-                                      uploadErrorMessage = err;
-                                    });
-                                    if (mounted) {
-                                      AppHelpers.showSnackBar(context, err, isError: true);
-                                    }
-                                    return;
-                                  }
-
-                                  if (fileBytes == null) {
-                                    throw Exception('Unable to read file bytes from device storage.');
-                                  }
-
-                                  setDialogState(() {
-                                    selectedFileName = fileName;
-                                    selectedFileSize = fileSize;
-                                    isUploading = true;
-                                    uploadProgress = 0.05;
-                                    uploadStatusText = 'Initiating upload to Cloudinary...';
-                                  });
-
-                                  final courseId = widget.courseId ?? 'course_${DateTime.now().millisecondsSinceEpoch}';
-                                  final lessonId = existingLes?.id ?? 'les_${DateTime.now().millisecondsSinceEpoch}';
-
-                                  final uploadResult = await _uploadService.uploadLessonVideo(
-                                    courseId: courseId,
-                                    lessonId: lessonId,
-                                    fileName: fileName,
-                                    fileBytes: fileBytes,
-                                    isPreview: isPreview,
-                                    onProgress: (progress, sent, total) {
-                                      setDialogState(() {
-                                        uploadProgress = progress;
-                                        final sentMb = (sent / (1024 * 1024)).toStringAsFixed(1);
-                                        final totalMb = (total / (1024 * 1024)).toStringAsFixed(1);
-                                        uploadStatusText = 'Uploading: ${(progress * 100).toStringAsFixed(0)}% ($sentMb MB / $totalMb MB)';
-                                      });
-                                    },
-                                  );
-
-                                  setDialogState(() {
-                                    isUploading = false;
-                                    uploadedPublicId = uploadResult.publicId;
-                                    uploadedSecureUrl = uploadResult.secureUrl;
-                                    if (uploadResult.durationSeconds > 0) {
-                                      final m = uploadResult.durationSeconds ~/ 60;
-                                      final s = uploadResult.durationSeconds % 60;
-                                      final autoDuration = '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-                                      durationCtrl.text = autoDuration;
-                                      uploadStatusText = 'Upload completed! (Duration: $autoDuration)';
-                                    } else {
-                                      uploadStatusText = 'Upload completed!';
-                                    }
-                                  });
-                                } catch (e) {
-                                  setDialogState(() {
-                                    isUploading = false;
-                                    uploadProgress = 0.0;
-                                    selectedFileName = null;
-                                    selectedFileSize = null;
-                                    uploadErrorMessage = e.toString();
-                                  });
-                                  if (mounted) {
-                                    AppHelpers.showSnackBar(context, 'Upload failed: $e', isError: true);
-                                  }
-                                }
-                              },
-                            ),
-                          if (uploadErrorMessage != null) ...[
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withOpacity(0.08),
-                                borderRadius: AppSpacing.roundedSm,
-                                border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline, size: 18, color: AppColors.error),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      uploadErrorMessage!,
-                                      style: AppTypography.bodySmall.copyWith(color: AppColors.error, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: isUploading ? null : () => Navigator.pop(ctx),
+                  onPressed: (isUploadingVideo || isUploadingResource) ? null : () => Navigator.pop(ctx),
                   child: const Text('Cancel'),
                 ),
                 AppButton(
@@ -579,7 +801,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       ? () async {
                           if (lessonTitleCtrl.text.trim().isEmpty) return;
 
-                          // If replaced video, delete old asset from Cloudinary
                           if (oldPublicId.isNotEmpty && oldPublicId != uploadedPublicId) {
                             debugPrint('[CourseBuilder] 🔄 Purging replaced video from Cloudinary: $oldPublicId');
                             _uploadService.deleteCloudinaryAsset(
@@ -596,6 +817,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                               existingLes.cloudinaryPublicId = uploadedPublicId;
                               existingLes.videoUrl = isPreview ? uploadedSecureUrl : '';
                               existingLes.isPreview = isPreview;
+                              existingLes.resources = draftResources;
                             } else {
                               final lessonId = 'les_${DateTime.now().millisecondsSinceEpoch}';
                               _modules[moduleIndex].lessons.add(
@@ -606,6 +828,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                   cloudinaryPublicId: uploadedPublicId,
                                   videoUrl: isPreview ? uploadedSecureUrl : '',
                                   isPreview: isPreview,
+                                  resources: draftResources,
                                 ),
                               );
                             }
@@ -615,10 +838,537 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       : () {
                           AppHelpers.showSnackBar(
                             context,
-                            'Please upload a video to Cloudinary before saving this lesson.',
+                            'Please upload a lecture video before saving this lesson.',
                             isError: true,
                           );
                         },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Interactive Question Editor Dialog for MCQ and True/False
+  Future<void> _showQuestionEditorDialog({
+    required BuildContext parentContext,
+    QuizQuestion? existingQuestion,
+    required ValueChanged<QuizQuestion> onQuestionSaved,
+  }) async {
+    final isEditing = existingQuestion != null;
+    final promptCtrl = TextEditingController(text: existingQuestion?.question ?? '');
+    final explanationCtrl = TextEditingController(text: existingQuestion?.explanation ?? '');
+    QuestionType selectedType = existingQuestion?.type ?? QuestionType.multipleChoice;
+
+    // Options controllers
+    List<TextEditingController> optionControllers = [];
+    int correctIndex = 0;
+
+    if (isEditing && existingQuestion.options.isNotEmpty) {
+      optionControllers = existingQuestion.options.map((o) => TextEditingController(text: o.text)).toList();
+      final idx = existingQuestion.options.indexWhere((o) => o.isCorrect);
+      if (idx >= 0) correctIndex = idx;
+    } else {
+      if (selectedType == QuestionType.trueFalse) {
+        optionControllers = [
+          TextEditingController(text: 'True'),
+          TextEditingController(text: 'False'),
+        ];
+      } else {
+        optionControllers = [
+          TextEditingController(text: 'Option A'),
+          TextEditingController(text: 'Option B'),
+          TextEditingController(text: 'Option C'),
+          TextEditingController(text: 'Option D'),
+        ];
+      }
+    }
+
+    await showDialog(
+      context: parentContext,
+      builder: (qCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setQState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+              title: Row(
+                children: [
+                  Icon(isEditing ? Icons.edit_note : Icons.help_outline, color: AppColors.secondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    isEditing ? 'Edit Quiz Question' : 'Add Question',
+                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Question Prompt
+                      TextField(
+                        controller: promptCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Question Prompt *',
+                          hintText: 'e.g. Which Cloudflare Worker route signs authenticated video stream URLs?',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Question Type Selector
+                      Row(
+                        children: [
+                          Text('Type: ', style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Multiple Choice'),
+                            selected: selectedType == QuestionType.multipleChoice,
+                            onSelected: (val) {
+                              if (val) {
+                                setQState(() {
+                                  selectedType = QuestionType.multipleChoice;
+                                  optionControllers = [
+                                    TextEditingController(text: 'Option A'),
+                                    TextEditingController(text: 'Option B'),
+                                    TextEditingController(text: 'Option C'),
+                                    TextEditingController(text: 'Option D'),
+                                  ];
+                                  correctIndex = 0;
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('True / False'),
+                            selected: selectedType == QuestionType.trueFalse,
+                            onSelected: (val) {
+                              if (val) {
+                                setQState(() {
+                                  selectedType = QuestionType.trueFalse;
+                                  optionControllers = [
+                                    TextEditingController(text: 'True'),
+                                    TextEditingController(text: 'False'),
+                                  ];
+                                  correctIndex = 0;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      Text(
+                        'Answers & Correct Choice (Select the radio of correct option):',
+                        style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Options Editor
+                      ...List.generate(optionControllers.length, (optIdx) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Radio<int>(
+                                value: optIdx,
+                                groupValue: correctIndex,
+                                activeColor: AppColors.success,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setQState(() => correctIndex = val);
+                                  }
+                                },
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: optionControllers[optIdx],
+                                  decoration: InputDecoration(
+                                    labelText: 'Option ${optIdx + 1}',
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              if (selectedType == QuestionType.multipleChoice && optionControllers.length > 2)
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 16, color: AppColors.error),
+                                  tooltip: 'Remove Option',
+                                  onPressed: () {
+                                    setQState(() {
+                                      optionControllers.removeAt(optIdx);
+                                      if (correctIndex >= optionControllers.length) {
+                                        correctIndex = 0;
+                                      }
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      if (selectedType == QuestionType.multipleChoice && optionControllers.length < 6)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.add, size: 16, color: AppColors.secondary),
+                            label: const Text('Add Option', style: TextStyle(color: AppColors.secondary)),
+                            onPressed: () {
+                              setQState(() {
+                                optionControllers.add(TextEditingController(text: 'Option ${optionControllers.length + 1}'));
+                              });
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+
+                      // Explanation / Feedback
+                      TextField(
+                        controller: explanationCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Explanation & Student Feedback (Optional)',
+                          hintText: 'Explains why the answer is correct upon quiz grading...',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(qCtx),
+                  child: const Text('Cancel'),
+                ),
+                AppButton(
+                  label: isEditing ? 'Update Question' : 'Add Question',
+                  variant: ButtonVariant.secondary,
+                  size: ButtonSize.sm,
+                  onPressed: () {
+                    final prompt = promptCtrl.text.trim();
+                    if (prompt.isEmpty) {
+                      AppHelpers.showSnackBar(parentContext, 'Please enter question text', isError: true);
+                      return;
+                    }
+
+                    final options = optionControllers.asMap().entries.map((entry) {
+                      return QuizOption(
+                        id: 'opt_${entry.key + 1}',
+                        text: entry.value.text.trim(),
+                        isCorrect: entry.key == correctIndex,
+                      );
+                    }).toList();
+
+                    final newQuestion = QuizQuestion(
+                      id: existingQuestion?.id ?? 'q_${DateTime.now().millisecondsSinceEpoch}',
+                      question: prompt,
+                      explanation: explanationCtrl.text.trim(),
+                      type: selectedType,
+                      options: options,
+                    );
+
+                    onQuestionSaved(newQuestion);
+                    Navigator.pop(qCtx);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Modal for creating or editing a full curriculum quiz
+  Future<void> _showAddOrEditQuizModal({QuizModel? existingQuiz, int? quizIndex}) async {
+    final isEditing = existingQuiz != null && quizIndex != null;
+
+    final titleCtrl = TextEditingController(text: existingQuiz?.title ?? 'Module 1 Assessment Quiz');
+    final descCtrl = TextEditingController(text: existingQuiz?.description ?? 'Test your knowledge on curriculum concepts');
+    final passingScoreCtrl = TextEditingController(text: (existingQuiz?.passingScore ?? 80).toString());
+    final timeLimitCtrl = TextEditingController(text: (existingQuiz?.timeLimitMinutes ?? 15).toString());
+
+    final List<QuizQuestion> draftQuestions = List<QuizQuestion>.from(existingQuiz?.questions ?? [
+      const QuizQuestion(
+        id: 'q_sample_1',
+        question: 'Which service provides signed video URLs in this application?',
+        explanation: 'Cloudflare Workers generate short-lived signed delivery URLs using the Cloudinary API secret.',
+        type: QuestionType.multipleChoice,
+        options: [
+          QuizOption(id: 'opt_1', text: 'Cloudflare Workers', isCorrect: true),
+          QuizOption(id: 'opt_2', text: 'Firebase Cloud Functions', isCorrect: false),
+          QuizOption(id: 'opt_3', text: 'Direct Client App', isCorrect: false),
+          QuizOption(id: 'opt_4', text: 'Jitsi Meet Bridge', isCorrect: false),
+        ],
+      ),
+    ]);
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setQuizState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+              title: Row(
+                children: [
+                  Icon(isEditing ? Icons.quiz : Icons.add_task, color: AppColors.secondary),
+                  const SizedBox(width: 10),
+                  Text(
+                    isEditing ? 'Edit Quiz & Assessment' : 'Create New Course Quiz',
+                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 620,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Basic Quiz Settings
+                      TextField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(labelText: 'Quiz Title *'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descCtrl,
+                        decoration: const InputDecoration(labelText: 'Description / Instructions'),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: passingScoreCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Passing Score (%)',
+                                suffixText: '%',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextField(
+                              controller: timeLimitCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Time Limit (Mins)',
+                                suffixText: 'mins',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Questions Management Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Questions (${draftQuestions.length})',
+                            style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          AppButton(
+                            label: 'Add Question',
+                            variant: ButtonVariant.outline,
+                            size: ButtonSize.sm,
+                            icon: Icons.add,
+                            onPressed: () {
+                              _showQuestionEditorDialog(
+                                parentContext: context,
+                                onQuestionSaved: (newQ) {
+                                  setQuizState(() {
+                                    draftQuestions.add(newQ);
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Questions List Preview
+                      if (draftQuestions.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: AppSpacing.roundedMd,
+                          ),
+                          child: const Center(
+                            child: Text('No questions added yet. Click "Add Question" above.'),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: draftQuestions.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, qIdx) {
+                            final q = draftQuestions[qIdx];
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLowest,
+                                borderRadius: AppSpacing.roundedSm,
+                                border: Border.all(color: AppColors.surfaceContainerHigh),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.secondary.withOpacity(0.12),
+                                          borderRadius: AppSpacing.roundedSm,
+                                        ),
+                                        child: Text(
+                                          'Q${qIdx + 1}',
+                                          style: AppTypography.labelSmall.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          q.question,
+                                          style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.secondary),
+                                        tooltip: 'Edit Question',
+                                        onPressed: () {
+                                          _showQuestionEditorDialog(
+                                            parentContext: context,
+                                            existingQuestion: q,
+                                            onQuestionSaved: (updatedQ) {
+                                              setQuizState(() {
+                                                draftQuestions[qIdx] = updatedQ;
+                                              });
+                                            },
+                                          );
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                        tooltip: 'Delete Question',
+                                        onPressed: () {
+                                          setQuizState(() {
+                                            draftQuestions.removeAt(qIdx);
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // Preview options
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: q.options.map((opt) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: opt.isCorrect ? AppColors.success.withOpacity(0.12) : AppColors.surfaceContainerLow,
+                                          borderRadius: AppSpacing.roundedSm,
+                                          border: Border.all(
+                                            color: opt.isCorrect ? AppColors.success.withOpacity(0.4) : AppColors.outlineVariant,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (opt.isCorrect) ...[
+                                              const Icon(Icons.check_circle, size: 12, color: AppColors.success),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            Text(
+                                              opt.text,
+                                              style: AppTypography.bodySmall.copyWith(
+                                                fontSize: 11,
+                                                fontWeight: opt.isCorrect ? FontWeight.w700 : FontWeight.normal,
+                                                color: opt.isCorrect ? AppColors.success : AppColors.onSurface,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                AppButton(
+                  label: isEditing ? 'Save Quiz Changes' : 'Create Quiz',
+                  variant: ButtonVariant.primary,
+                  size: ButtonSize.sm,
+                  onPressed: () {
+                    final title = titleCtrl.text.trim();
+                    if (title.isEmpty) {
+                      AppHelpers.showSnackBar(context, 'Please enter a quiz title', isError: true);
+                      return;
+                    }
+                    if (draftQuestions.isEmpty) {
+                      AppHelpers.showSnackBar(context, 'Please add at least 1 question to the quiz', isError: true);
+                      return;
+                    }
+
+                    final passingScore = int.tryParse(passingScoreCtrl.text.trim()) ?? 80;
+                    final timeLimit = int.tryParse(timeLimitCtrl.text.trim()) ?? 15;
+                    final courseId = widget.courseId ?? 'course_${DateTime.now().millisecondsSinceEpoch}';
+
+                    final quiz = QuizModel(
+                      id: existingQuiz?.id ?? 'quiz_${DateTime.now().millisecondsSinceEpoch}',
+                      courseId: courseId,
+                      title: title,
+                      description: descCtrl.text.trim(),
+                      passingScore: passingScore,
+                      timeLimitMinutes: timeLimit,
+                      questions: draftQuestions,
+                    );
+
+                    setState(() {
+                      if (isEditing) {
+                        _quizzes[quizIndex] = quiz;
+                      } else {
+                        _quizzes.add(quiz);
+                      }
+                    });
+
+                    Navigator.pop(ctx);
+                    AppHelpers.showSnackBar(context, isEditing ? 'Quiz updated successfully!' : 'Quiz added to course!');
+                  },
                 ),
               ],
             );
@@ -656,10 +1406,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
               courseId: courseId,
               title: les.title,
               duration: les.duration,
-              videoUrl: les.videoUrl, // Only populated for preview lessons; empty for paid
+              videoUrl: les.videoUrl,
               cloudinaryPublicId: les.cloudinaryPublicId,
               order: lesEntry.key + 1,
               isPreview: les.isPreview,
+              resources: les.resources,
             );
           }).toList(),
         );
@@ -699,9 +1450,15 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
           'Build end-to-end full stack mobile and web projects',
           'Deploy applications to production and handle scaling',
         ],
+        quizzes: _quizzes,
         isFeatured: true,
         isTrending: true,
       );
+
+      // Sync quizzes to Firestore quizzes collection
+      for (final q in _quizzes) {
+        await _quizService.saveOrUpdateQuiz(q);
+      }
 
       if (_isEditMode) {
         await ref.read(courseServiceProvider).updateCourse(course);
@@ -725,6 +1482,124 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
       }
     } finally {
       if (mounted) setState(() => _isPublishing = false);
+    }
+  }
+
+  /// Handles double-confirmed deletion of the entire course and all Cloudinary assets
+  Future<void> _handleDeleteCourse() async {
+    final courseId = widget.courseId;
+    if (courseId == null || courseId.isEmpty) return;
+
+    final courseTitle = _titleController.text.trim().isNotEmpty
+        ? _titleController.text.trim()
+        : 'this course';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.12),
+                borderRadius: AppSpacing.roundedSm,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Delete Course Permanently?',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurface),
+                children: [
+                  const TextSpan(text: 'Are you sure you want to permanently delete '),
+                  TextSpan(
+                    text: '"$courseTitle"',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                  const TextSpan(text: '?'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppSpacing.roundedMd,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ This action is permanent and irreversible:',
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.error, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '• All video lessons will be purged from Cloudinary storage console.\n'
+                    '• All downloadable PDFs, blueprints & resources will be deleted.\n'
+                    '• Quizzes, reviews, and live class schedules will be erased.\n'
+                    '• Course will be permanently removed from database and search.',
+                    style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant, fontSize: 12, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedSm),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Delete Course Forever', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      AppHelpers.showSnackBar(context, 'Deleting course and purging Cloudinary console assets...');
+      final user = ref.read(authProvider);
+      await ref.read(courseServiceProvider).deleteCourse(courseId, userId: user?.id);
+
+      // Clean all quizzes for this course
+      for (final q in _quizzes) {
+        await _quizService.deleteQuiz(q.id);
+      }
+
+      ref.read(courseRefreshCounterProvider.notifier).state++;
+      ref.invalidate(allCoursesProvider);
+      ref.invalidate(courseByIdProvider(courseId));
+
+      if (mounted) {
+        AppHelpers.showSnackBar(context, '✅ Course and all Cloudinary assets permanently deleted.');
+        context.go('/instructor');
+      }
     }
   }
 
@@ -767,21 +1642,40 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _isEditMode
-                            ? 'Update curriculum, pricing, and video lectures'
-                            : 'Build your curriculum, upload videos to Cloudinary, and publish to students',
+                            ? 'Update curriculum, downloadable resources, and quizzes'
+                            : 'Build curriculum, upload videos/resources to Cloudinary, and create assessments',
                         style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
-                  AppButton(
-                    label: _isPublishing
-                        ? 'Saving...'
-                        : (_isEditMode ? 'Save Changes' : 'Publish Course'),
-                    variant: ButtonVariant.secondary,
-                    size: ButtonSize.md,
-                    icon: _isEditMode ? Icons.save : Icons.rocket_launch,
-                    isLoading: _isPublishing,
-                    onPressed: _handlePublishCourse,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isEditMode) ...[
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedSm),
+                          ),
+                          icon: const Icon(Icons.delete_forever, size: 18),
+                          label: const Text('Delete Course', style: TextStyle(fontWeight: FontWeight.w700)),
+                          onPressed: _handleDeleteCourse,
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      AppButton(
+                        label: _isPublishing
+                            ? 'Saving...'
+                            : (_isEditMode ? 'Save Changes' : 'Publish Course'),
+                        variant: ButtonVariant.secondary,
+                        size: ButtonSize.md,
+                        icon: _isEditMode ? Icons.save : Icons.rocket_launch,
+                        isLoading: _isPublishing,
+                        onPressed: _handlePublishCourse,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -917,49 +1811,75 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  const Icon(Icons.folder_outlined, size: 20, color: AppColors.secondary),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                  ConstrainedBox(
+                                    constraints: BoxConstraints(maxWidth: isDesktop ? 600 : 220),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(mod.title, style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
-                                        if (mod.description.isNotEmpty)
-                                          Text(
-                                            mod.description,
-                                            style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                        const Icon(Icons.folder_outlined, size: 20, color: AppColors.secondary),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                mod.title,
+                                                style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (mod.description.isNotEmpty)
+                                                Text(
+                                                  mod.description,
+                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                            ],
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
-                                    tooltip: 'Rename / Edit Module',
-                                    onPressed: () => _showModuleDialog(editIndex: modIdx),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  AppButton(
-                                    label: 'Add Lesson',
-                                    variant: ButtonVariant.outline,
-                                    size: ButtonSize.sm,
-                                    icon: Icons.video_call,
-                                    onPressed: () => _showAddOrEditLessonModal(modIdx),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                                    tooltip: 'Delete Module',
-                                    onPressed: () {
-                                      if (_modules.length > 1) {
-                                        setState(() => _modules.removeAt(modIdx));
-                                      } else {
-                                        AppHelpers.showSnackBar(context, 'Course must have at least one curriculum module', isError: true);
-                                      }
-                                    },
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
+                                        tooltip: 'Rename / Edit Module',
+                                        onPressed: () => _showModuleDialog(editIndex: modIdx),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      AppButton(
+                                        label: 'Add Lesson',
+                                        variant: ButtonVariant.outline,
+                                        size: ButtonSize.sm,
+                                        icon: Icons.video_call,
+                                        onPressed: () => _showAddOrEditLessonModal(modIdx),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                        tooltip: 'Delete Module',
+                                        onPressed: () {
+                                          if (_modules.length > 1) {
+                                            setState(() => _modules.removeAt(modIdx));
+                                          } else {
+                                            AppHelpers.showSnackBar(context, 'Course must have at least one curriculum module', isError: true);
+                                          }
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -968,7 +1888,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                                   child: Text(
-                                    'No lessons added yet. Click "Add Lesson" to upload a video.',
+                                    'No lessons added yet. Click "Add Lesson" to upload a video and resources.',
                                     style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
                                   ),
                                 )
@@ -998,11 +1918,13 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(les.title, style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w600)),
-                                                const SizedBox(height: 2),
-                                                Row(
+                                                const SizedBox(height: 4),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 4,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
                                                   children: [
                                                     Text(les.duration, style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
-                                                    const SizedBox(width: 8),
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                       decoration: BoxDecoration(
@@ -1012,13 +1934,36 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                                       child: Text(
                                                         les.isPreview
                                                             ? 'Free Preview'
-                                                            : 'Authenticated (Cloudinary: ${les.cloudinaryPublicId})',
+                                                            : 'Authenticated Stream',
                                                         style: AppTypography.labelSmall.copyWith(
                                                           fontSize: 10,
                                                           color: les.isPreview ? AppColors.onSecondaryContainer : AppColors.onSurfaceVariant,
                                                         ),
                                                       ),
                                                     ),
+                                                    if (les.resources.isNotEmpty)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: AppColors.secondary.withOpacity(0.12),
+                                                          borderRadius: AppSpacing.roundedSm,
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.attachment, size: 10, color: AppColors.secondary),
+                                                            const SizedBox(width: 2),
+                                                            Text(
+                                                              '${les.resources.length} file(s)',
+                                                              style: AppTypography.labelSmall.copyWith(
+                                                                fontSize: 10,
+                                                                color: AppColors.secondary,
+                                                                fontWeight: FontWeight.w700,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                   ],
                                                 ),
                                               ],
@@ -1026,7 +1971,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.secondary),
-                                            tooltip: 'Edit / Replace Video',
+                                            tooltip: 'Edit / Replace Video & Resources',
                                             onPressed: () => _showAddOrEditLessonModal(modIdx, lessonIndex: lesIdx),
                                           ),
                                           IconButton(
@@ -1044,6 +1989,201 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                         );
                       },
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Quizzes & Assessments Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppSpacing.roundedLg,
+                  border: Border.all(color: AppColors.surfaceContainerHigh),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.quiz_outlined, color: AppColors.secondary, size: 22),
+                            const SizedBox(width: 8),
+                            Text('Course Quizzes & Assessments', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                        AppButton(
+                          label: 'Add Quiz',
+                          variant: ButtonVariant.outline,
+                          size: ButtonSize.sm,
+                          icon: Icons.add_task,
+                          onPressed: () => _showAddOrEditQuizModal(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Create assessments for students to evaluate their mastery and earn course certificates.',
+                      style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (_quizzes.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: AppSpacing.roundedMd,
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              const Icon(Icons.help_outline, size: 36, color: AppColors.outline),
+                              const SizedBox(height: 8),
+                              Text(
+                                'No assessments created yet for this course.',
+                                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 10),
+                              AppButton(
+                                label: 'Create First Assessment Quiz',
+                                variant: ButtonVariant.secondary,
+                                size: ButtonSize.sm,
+                                icon: Icons.add,
+                                onPressed: () => _showAddOrEditQuizModal(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _quizzes.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, qIdx) {
+                          final quiz = _quizzes[qIdx];
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: AppSpacing.roundedMd,
+                              border: Border.all(color: AppColors.surfaceContainerHigh),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withOpacity(0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.fact_check_outlined, color: AppColors.secondary, size: 20),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        quiz.title,
+                                        style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                                      ),
+                                      if (quiz.description.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          quiz.description,
+                                          style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.secondary.withOpacity(0.12),
+                                              borderRadius: AppSpacing.roundedSm,
+                                            ),
+                                            child: Text(
+                                              '${quiz.questions.length} Questions',
+                                              style: AppTypography.labelSmall.copyWith(
+                                                color: AppColors.secondary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.success.withOpacity(0.12),
+                                              borderRadius: AppSpacing.roundedSm,
+                                            ),
+                                            child: Text(
+                                              '${quiz.passingScore}% Passing',
+                                              style: AppTypography.labelSmall.copyWith(
+                                                color: AppColors.success,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surfaceContainerHigh,
+                                              borderRadius: AppSpacing.roundedSm,
+                                            ),
+                                            child: Text(
+                                              '${quiz.timeLimitMinutes} Mins',
+                                              style: AppTypography.labelSmall.copyWith(
+                                                color: AppColors.onSurfaceVariant,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
+                                  tooltip: 'Edit Quiz & Questions',
+                                  onPressed: () => _showAddOrEditQuizModal(existingQuiz: quiz, quizIndex: qIdx),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                  tooltip: 'Delete Quiz',
+                                  onPressed: () async {
+                                    await _quizService.deleteQuiz(quiz.id);
+                                    setState(() {
+                                      _quizzes.removeAt(qIdx);
+                                    });
+                                    if (context.mounted) {
+                                      AppHelpers.showSnackBar(context, 'Quiz removed from course');
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),

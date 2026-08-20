@@ -70,7 +70,12 @@ class CourseDetailsScreen extends ConsumerWidget {
                 children: [
                   // Back Navigation Breadcrumb (Role & Ownership Aware)
                   InkWell(
-                    onTap: () => context.go(backTarget),
+                    onTap: () {
+                      if (isOwnInstructorCourse && user?.role != UserRole.instructor) {
+                        ref.read(authProvider.notifier).switchRole(UserRole.instructor);
+                      }
+                      context.go(backTarget);
+                    },
                     borderRadius: AppSpacing.roundedMd,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 2.0),
@@ -139,57 +144,64 @@ class CourseDetailsScreen extends ConsumerWidget {
 
                             // Badges & Wishlist Header
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondaryFixedDim.withOpacity(0.25),
-                                    borderRadius: AppSpacing.roundedSm,
-                                  ),
-                                  child: Text(
-                                    course.category,
-                                    style: AppTypography.labelSmall.copyWith(
-                                      color: AppColors.secondary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceContainerHigh,
-                                    borderRadius: AppSpacing.roundedSm,
-                                  ),
-                                  child: Text(
-                                    course.level,
-                                    style: AppTypography.labelSmall.copyWith(
-                                      color: AppColors.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                if (isOwnInstructorCourse) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: AppSpacing.roundedSm,
-                                    ),
-                                    child: Text(
-                                      'YOUR COURSE',
-                                      style: AppTypography.labelSmall.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
+                                Expanded(
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.secondaryFixedDim.withOpacity(0.25),
+                                          borderRadius: AppSpacing.roundedSm,
+                                        ),
+                                        child: Text(
+                                          course.category,
+                                          style: AppTypography.labelSmall.copyWith(
+                                            color: AppColors.secondary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceContainerHigh,
+                                          borderRadius: AppSpacing.roundedSm,
+                                        ),
+                                        child: Text(
+                                          course.level,
+                                          style: AppTypography.labelSmall.copyWith(
+                                            color: AppColors.onSurfaceVariant,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isOwnInstructorCourse)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            borderRadius: AppSpacing.roundedSm,
+                                          ),
+                                          child: Text(
+                                            'YOUR COURSE',
+                                            style: AppTypography.labelSmall.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                ],
-                                const Spacer(),
+                                ),
                                 // Wishlist Toggle
                                 if (!isOwnInstructorCourse)
                                   IconButton(
+                                    visualDensity: VisualDensity.compact,
                                     icon: Icon(
                                       isWishlisted ? Icons.favorite : Icons.favorite_border,
                                       color: isWishlisted ? AppColors.error : AppColors.outline,
@@ -309,13 +321,10 @@ class CourseDetailsScreen extends ConsumerWidget {
         children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: Image.network(
-              course.thumbnailUrl,
+            child: AppHelpers.buildCachedImage(
+              imageUrl: course.thumbnailUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: AppColors.surfaceContainerHigh,
-                child: const Center(child: Icon(Icons.image, size: 50, color: AppColors.outline)),
-              ),
+              memCacheWidth: 800,
             ),
           ),
           Container(
@@ -446,15 +455,27 @@ class CourseDetailsScreen extends ConsumerWidget {
                       style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(Icons.star_rounded, size: 14, color: AppColors.star),
-                        const SizedBox(width: 2),
-                        Text('${course.instructor.rating} Rating', style: AppTypography.labelSmall),
-                        const SizedBox(width: 10),
-                        const Icon(Icons.people_outline, size: 14, color: AppColors.outline),
-                        const SizedBox(width: 2),
-                        Text('${AppFormatters.formatCount(course.instructor.studentsCount)} Students', style: AppTypography.labelSmall),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, size: 14, color: AppColors.star),
+                            const SizedBox(width: 2),
+                            Text('${course.instructor.rating} Rating', style: AppTypography.labelSmall),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.people_outline, size: 14, color: AppColors.outline),
+                            const SizedBox(width: 2),
+                            Text('${AppFormatters.formatCount(course.instructor.studentsCount)} Students', style: AppTypography.labelSmall),
+                          ],
+                        ),
                       ],
                     ),
                   ],
@@ -582,11 +603,15 @@ class CourseDetailsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('Student Feedback & Reviews', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.star_rounded, color: AppColors.star, size: 20),
                   const SizedBox(width: 4),
@@ -598,10 +623,13 @@ class CourseDetailsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
 
           // Rating CTA Button & count
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('${course.reviewCount} verified reviews', style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
-              const Spacer(),
               TextButton.icon(
                 icon: const Icon(Icons.rate_review_outlined, size: 16, color: AppColors.secondary),
                 label: const Text('Leave a Review', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -941,7 +969,13 @@ class CourseDetailsScreen extends ConsumerWidget {
               variant: ButtonVariant.primary,
               isFullWidth: true,
               icon: Icons.edit,
-              onPressed: () => context.go('/builder'),
+              onPressed: () {
+                final authUser = ref.read(authProvider);
+                if (authUser?.role != UserRole.instructor) {
+                  ref.read(authProvider.notifier).switchRole(UserRole.instructor);
+                }
+                context.go('/builder?courseId=${course.id}');
+              },
             ),
             const SizedBox(height: 10),
             AppButton(
@@ -949,7 +983,13 @@ class CourseDetailsScreen extends ConsumerWidget {
               variant: ButtonVariant.outline,
               isFullWidth: true,
               icon: Icons.dashboard,
-              onPressed: () => context.go('/instructor'),
+              onPressed: () {
+                final authUser = ref.read(authProvider);
+                if (authUser?.role != UserRole.instructor) {
+                  ref.read(authProvider.notifier).switchRole(UserRole.instructor);
+                }
+                context.go('/instructor');
+              },
             ),
           ] else if (isEnrolled) ...[
             AppButton(

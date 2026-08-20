@@ -155,10 +155,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       child: SizedBox(
                                         width: isDesktop ? 110 : 78,
                                         height: isDesktop ? 70 : 52,
-                                        child: Image.network(
-                                          course.thumbnailUrl,
+                                        child: AppHelpers.buildCachedImage(
+                                          imageUrl: course.thumbnailUrl,
+                                          width: isDesktop ? 110 : 78,
+                                          height: isDesktop ? 70 : 52,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceContainerLow),
+                                          memCacheWidth: 250,
                                         ),
                                       ),
                                     ),

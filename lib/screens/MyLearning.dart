@@ -127,14 +127,17 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.surfaceContainerHigh)),
                 ),
-                child: Row(
-                  children: [
-                    _tabButton('In Progress', 0),
-                    const SizedBox(width: 24),
-                    _tabButton('Completed', 1),
-                    const SizedBox(width: 24),
-                    _tabButton('Wishlist (${wishlist.length})', 2),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _tabButton('In Progress', 0),
+                      SizedBox(width: isDesktop ? 24 : 16),
+                      _tabButton('Completed', 1),
+                      SizedBox(width: isDesktop ? 24 : 16),
+                      _tabButton('Wishlist (${wishlist.length})', 2),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -383,16 +386,26 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                             children: [
                                               Expanded(
                                                 child: AppButton(
-                                                  label: isCompleted ? 'Review Lessons' : 'Resume',
-                                                  variant: isCompleted ? ButtonVariant.outline : ButtonVariant.primary,
+                                                  label: isCompleted ? 'Certificate 🎓' : 'Resume',
+                                                  variant: isCompleted ? ButtonVariant.secondary : ButtonVariant.primary,
                                                   size: ButtonSize.md,
                                                   icon: isCompleted ? Icons.workspace_premium : Icons.play_arrow,
                                                   onPressed: () {
-                                                    context.go('/lesson/${course.id}/$resumeLessonId');
+                                                    if (isCompleted) {
+                                                      context.go('/certificates');
+                                                    } else {
+                                                      context.go('/lesson/${course.id}/$resumeLessonId');
+                                                    }
                                                   },
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 6),
+                                              if (isCompleted)
+                                                IconButton(
+                                                  icon: const Icon(Icons.play_circle_outline, color: AppColors.secondary),
+                                                  tooltip: 'Review Lessons',
+                                                  onPressed: () => context.go('/lesson/${course.id}/$resumeLessonId'),
+                                                ),
                                               IconButton(
                                                 icon: const Icon(Icons.star_rate_rounded, color: AppColors.star),
                                                 tooltip: 'Rate & Review Course',
@@ -466,10 +479,12 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                 child: SizedBox(
                                   width: 100,
                                   height: 70,
-                                  child: Image.network(
-                                    course.thumbnailUrl,
+                                  child: AppHelpers.buildCachedImage(
+                                    imageUrl: course.thumbnailUrl,
+                                    width: 100,
+                                    height: 70,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceContainerLow),
+                                    memCacheWidth: 250,
                                   ),
                                 ),
                               ),
