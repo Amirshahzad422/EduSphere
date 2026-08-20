@@ -47,11 +47,13 @@ class _DraftLesson {
 class _DraftModule {
   String id;
   String title;
+  String description;
   List<_DraftLesson> lessons;
 
   _DraftModule({
     required this.id,
     required this.title,
+    this.description = '',
     required this.lessons,
   });
 }
@@ -78,6 +80,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
     _DraftModule(
       id: 'mod_1',
       title: 'Module 1: Architecture & Setup',
+      description: 'Foundations of clean architecture, environment configuration, and state setup.',
       lessons: [
         _DraftLesson(
           id: 'les_1_1',
@@ -125,6 +128,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
             _DraftModule(
               id: m.id,
               title: m.title,
+              description: m.description,
               lessons: m.lessons
                   .map((l) => _DraftLesson(
                         id: l.id,
@@ -156,28 +160,140 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
     super.dispose();
   }
 
-  void _addModule() {
-    setState(() {
-      final nextIdx = _modules.length + 1;
-      _modules.add(
-        _DraftModule(
-          id: 'mod_$nextIdx',
-          title: 'Module $nextIdx: Core Implementation',
-          lessons: [],
-        ),
-      );
-    });
+  /// Opens dialog to create a new module or edit/rename an existing module
+  Future<void> _showModuleDialog({int? editIndex}) async {
+    final isEditing = editIndex != null;
+    final existingMod = isEditing ? _modules[editIndex] : null;
+
+    final titleCtrl = TextEditingController(
+      text: existingMod != null ? existingMod.title : 'Module ${_modules.length + 1}: ',
+    );
+    final descCtrl = TextEditingController(
+      text: existingMod != null ? existingMod.description : '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+          title: Row(
+            children: [
+              Icon(isEditing ? Icons.edit_note : Icons.create_new_folder_outlined, color: AppColors.secondary),
+              const SizedBox(width: 10),
+              Text(
+                isEditing ? 'Edit Module Details' : 'Add Curriculum Module',
+                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Module Title *',
+                    hintText: 'e.g. Module 2: State Management & Architecture',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Module Summary / Description',
+                    hintText: 'Brief summary of concepts taught in this module...',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            AppButton(
+              label: isEditing ? 'Save Changes' : 'Create Module',
+              variant: ButtonVariant.secondary,
+              size: ButtonSize.sm,
+              onPressed: () {
+                final title = titleCtrl.text.trim();
+                if (title.isEmpty) {
+                  AppHelpers.showSnackBar(context, 'Please enter a module title', isError: true);
+                  return;
+                }
+
+                setState(() {
+                  if (isEditing) {
+                    // Update only module title & description, strictly preserving all lessons & IDs
+                    existingMod!.title = title;
+                    existingMod.description = descCtrl.text.trim();
+                  } else {
+                    final nextId = 'mod_${DateTime.now().millisecondsSinceEpoch}';
+                    _modules.add(
+                      _DraftModule(
+                        id: nextId,
+                        title: title,
+                        description: descCtrl.text.trim(),
+                        lessons: [],
+                      ),
+                    );
+                  }
+                });
+
+                Navigator.pop(ctx);
+                if (isEditing) {
+                  AppHelpers.showSnackBar(context, 'Module updated successfully');
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  Future<void> _showAddLessonModal(int moduleIndex) async {
-    final lessonTitleCtrl = TextEditingController(text: 'New Lecture Video');
-    final durationCtrl = TextEditingController(text: '15m');
-    bool isPreview = false;
+  /// Removes a lesson and cleans up orphaned Cloudinary asset from remote storage
+  Future<void> _removeLesson(int modIdx, int lesIdx) async {
+    final lesson = _modules[modIdx].lessons[lesIdx];
+    final publicId = lesson.cloudinaryPublicId;
+
+    setState(() {
+      _modules[modIdx].lessons.removeAt(lesIdx);
+    });
+
+    if (publicId.isNotEmpty) {
+      debugPrint('[CourseBuilder] 🗑️ Deleting removed lesson asset from Cloudinary: $publicId');
+      await _uploadService.deleteCloudinaryAsset(
+        publicId: publicId,
+        courseId: widget.courseId,
+        resourceType: 'video',
+      );
+      if (mounted) {
+        AppHelpers.showSnackBar(context, 'Lesson removed & remote storage cleaned up');
+      }
+    }
+  }
+
+  Future<void> _showAddOrEditLessonModal(int moduleIndex, {int? lessonIndex}) async {
+    final isEditing = lessonIndex != null;
+    final existingLes = isEditing ? _modules[moduleIndex].lessons[lessonIndex] : null;
+
+    final lessonTitleCtrl = TextEditingController(text: existingLes?.title ?? 'New Lecture Video');
+    final durationCtrl = TextEditingController(text: existingLes?.duration ?? '15m');
+    bool isPreview = existingLes?.isPreview ?? false;
     bool isUploading = false;
     double uploadProgress = 0.0;
     String uploadStatusText = '';
-    String uploadedPublicId = '';
-    String uploadedSecureUrl = '';
+    String uploadedPublicId = existingLes?.cloudinaryPublicId ?? '';
+    String uploadedSecureUrl = existingLes?.videoUrl ?? '';
+    final String oldPublicId = existingLes?.cloudinaryPublicId ?? '';
     String? selectedFileName;
     int? selectedFileSize;
     String? uploadErrorMessage;
@@ -188,16 +304,19 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
-            final canAddToModule = uploadedPublicId.isNotEmpty && !isUploading;
+            final canSaveLesson = uploadedPublicId.isNotEmpty && !isUploading;
 
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
               title: Row(
                 children: [
-                  const Icon(Icons.video_library, color: AppColors.secondary),
+                  Icon(isEditing ? Icons.video_settings : Icons.video_library, color: AppColors.secondary),
                   const SizedBox(width: 10),
-                  Text('Add Lesson & Upload Video', style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    isEditing ? 'Edit Lesson & Video' : 'Add Lesson & Upload Video',
+                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -227,7 +346,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                               setDialogState(() {
                                 isPreview = val;
                                 // Reset upload if access preset changes
-                                if (uploadedPublicId.isNotEmpty) {
+                                if (uploadedPublicId.isNotEmpty && uploadedPublicId != oldPublicId) {
                                   uploadedPublicId = '';
                                   uploadedSecureUrl = '';
                                   selectedFileName = null;
@@ -251,7 +370,10 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                             children: [
                               const Icon(Icons.cloud_upload_outlined, color: AppColors.secondary, size: 20),
                               const SizedBox(width: 8),
-                              Text('Cloudinary Video Upload', style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700)),
+                              Text(
+                                isEditing ? 'Replace Lecture Video' : 'Cloudinary Video Upload',
+                                style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -265,6 +387,23 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
+                          if (uploadedPublicId.isNotEmpty && selectedFileName == null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondary),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Current Asset: $uploadedPublicId',
+                                      style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w600),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           if (selectedFileName != null && uploadedPublicId.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
@@ -295,32 +434,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                   : 'Uploading: ${(uploadProgress * 100).toStringAsFixed(0)}%',
                               style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
                             ),
-                          ] else if (uploadedPublicId.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondaryContainer,
-                                borderRadius: AppSpacing.roundedSm,
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.check_circle, color: AppColors.secondary, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Upload Verified & Stored', style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.w700)),
-                                        Text('Public ID: $uploadedPublicId', style: AppTypography.bodySmall.copyWith(fontSize: 11)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
+                          ] else
                             AppButton(
-                              label: uploadErrorMessage != null ? 'Retry Upload' : 'Pick & Upload Video File',
+                              label: uploadErrorMessage != null
+                                  ? 'Retry Upload'
+                                  : (uploadedPublicId.isNotEmpty ? 'Replace Video File' : 'Pick & Upload Video File'),
                               variant: ButtonVariant.outline,
                               size: ButtonSize.sm,
                               icon: Icons.upload_file,
@@ -352,7 +470,6 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                     setDialogState(() {
                                       selectedFileName = null;
                                       selectedFileSize = null;
-                                      uploadedPublicId = '';
                                       uploadErrorMessage = err;
                                     });
                                     if (mounted) {
@@ -374,7 +491,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                   });
 
                                   final courseId = widget.courseId ?? 'course_${DateTime.now().millisecondsSinceEpoch}';
-                                  final lessonId = 'les_${DateTime.now().millisecondsSinceEpoch}';
+                                  final lessonId = existingLes?.id ?? 'les_${DateTime.now().millisecondsSinceEpoch}';
 
                                   final uploadResult = await _uploadService.uploadLessonVideo(
                                     courseId: courseId,
@@ -407,14 +524,11 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                     }
                                   });
                                 } catch (e) {
-                                  // Clean up state on upload failure: remove file name and block add button
                                   setDialogState(() {
                                     isUploading = false;
                                     uploadProgress = 0.0;
                                     selectedFileName = null;
                                     selectedFileSize = null;
-                                    uploadedPublicId = '';
-                                    uploadedSecureUrl = '';
                                     uploadErrorMessage = e.toString();
                                   });
                                   if (mounted) {
@@ -458,31 +572,50 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                   child: const Text('Cancel'),
                 ),
                 AppButton(
-                  label: 'Add to Module',
+                  label: isEditing ? 'Save Lesson' : 'Add to Module',
                   variant: ButtonVariant.primary,
                   size: ButtonSize.sm,
-                  onPressed: canAddToModule
-                      ? () {
+                  onPressed: canSaveLesson
+                      ? () async {
                           if (lessonTitleCtrl.text.trim().isEmpty) return;
-                          final lessonId = 'les_${DateTime.now().millisecondsSinceEpoch}';
-                          setState(() {
-                            _modules[moduleIndex].lessons.add(
-                              _DraftLesson(
-                                id: lessonId,
-                                title: lessonTitleCtrl.text.trim(),
-                                duration: durationCtrl.text.trim().isEmpty ? '15m' : durationCtrl.text.trim(),
-                                cloudinaryPublicId: uploadedPublicId,
-                                videoUrl: isPreview ? uploadedSecureUrl : '',
-                                isPreview: isPreview,
-                              ),
+
+                          // If replaced video, delete old asset from Cloudinary
+                          if (oldPublicId.isNotEmpty && oldPublicId != uploadedPublicId) {
+                            debugPrint('[CourseBuilder] 🔄 Purging replaced video from Cloudinary: $oldPublicId');
+                            _uploadService.deleteCloudinaryAsset(
+                              publicId: oldPublicId,
+                              courseId: widget.courseId,
+                              resourceType: 'video',
                             );
+                          }
+
+                          setState(() {
+                            if (isEditing) {
+                              existingLes!.title = lessonTitleCtrl.text.trim();
+                              existingLes.duration = durationCtrl.text.trim().isEmpty ? '15m' : durationCtrl.text.trim();
+                              existingLes.cloudinaryPublicId = uploadedPublicId;
+                              existingLes.videoUrl = isPreview ? uploadedSecureUrl : '';
+                              existingLes.isPreview = isPreview;
+                            } else {
+                              final lessonId = 'les_${DateTime.now().millisecondsSinceEpoch}';
+                              _modules[moduleIndex].lessons.add(
+                                _DraftLesson(
+                                  id: lessonId,
+                                  title: lessonTitleCtrl.text.trim(),
+                                  duration: durationCtrl.text.trim().isEmpty ? '15m' : durationCtrl.text.trim(),
+                                  cloudinaryPublicId: uploadedPublicId,
+                                  videoUrl: isPreview ? uploadedSecureUrl : '',
+                                  isPreview: isPreview,
+                                ),
+                              );
+                            }
                           });
                           Navigator.pop(ctx);
                         }
                       : () {
                           AppHelpers.showSnackBar(
                             context,
-                            'Please upload a video to Cloudinary before adding this lesson.',
+                            'Please upload a video to Cloudinary before saving this lesson.',
                             isError: true,
                           );
                         },
@@ -515,7 +648,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
         return ModuleModel(
           id: mod.id,
           title: mod.title,
-          description: '${mod.title} description.',
+          description: mod.description.isNotEmpty ? mod.description : '${mod.title} description.',
           lessons: mod.lessons.asMap().entries.map((lesEntry) {
             final les = lesEntry.value;
             return LessonModel(
@@ -672,31 +805,57 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                       decoration: const InputDecoration(labelText: 'Course Title *'),
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _categoryController,
-                            decoration: const InputDecoration(labelText: 'Category'),
+                    if (isDesktop)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _categoryController,
+                              decoration: const InputDecoration(labelText: 'Category'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _priceController,
-                            decoration: const InputDecoration(labelText: 'Price (\$USD) *', prefixText: '\$ '),
-                            keyboardType: TextInputType.number,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _priceController,
+                              decoration: const InputDecoration(labelText: 'Price (\$USD) *', prefixText: '\$ '),
+                              keyboardType: TextInputType.number,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _levelController,
-                            decoration: const InputDecoration(labelText: 'Level (e.g. Beginner, Advanced)'),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _levelController,
+                              decoration: const InputDecoration(labelText: 'Level (e.g. Beginner, Advanced)'),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      )
+                    else ...[
+                      TextFormField(
+                        controller: _categoryController,
+                        decoration: const InputDecoration(labelText: 'Category'),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _priceController,
+                              decoration: const InputDecoration(labelText: 'Price (\$USD) *', prefixText: '\$ '),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _levelController,
+                              decoration: const InputDecoration(labelText: 'Level'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _thumbnailController,
@@ -736,7 +895,7 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                           variant: ButtonVariant.outline,
                           size: ButtonSize.sm,
                           icon: Icons.add,
-                          onPressed: _addModule,
+                          onPressed: () => _showModuleDialog(),
                         ),
                       ],
                     ),
@@ -763,21 +922,42 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                   const Icon(Icons.folder_outlined, size: 20, color: AppColors.secondary),
                                   const SizedBox(width: 10),
                                   Expanded(
-                                    child: Text(mod.title, style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(mod.title, style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
+                                        if (mod.description.isNotEmpty)
+                                          Text(
+                                            mod.description,
+                                            style: AppTypography.bodySmall.copyWith(color: AppColors.outline, fontSize: 11),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                      ],
+                                    ),
                                   ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.secondary),
+                                    tooltip: 'Rename / Edit Module',
+                                    onPressed: () => _showModuleDialog(editIndex: modIdx),
+                                  ),
+                                  const SizedBox(width: 4),
                                   AppButton(
                                     label: 'Add Lesson',
                                     variant: ButtonVariant.outline,
                                     size: ButtonSize.sm,
                                     icon: Icons.video_call,
-                                    onPressed: () => _showAddLessonModal(modIdx),
+                                    onPressed: () => _showAddOrEditLessonModal(modIdx),
                                   ),
                                   const SizedBox(width: 8),
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                    tooltip: 'Delete Module',
                                     onPressed: () {
                                       if (_modules.length > 1) {
                                         setState(() => _modules.removeAt(modIdx));
+                                      } else {
+                                        AppHelpers.showSnackBar(context, 'Course must have at least one curriculum module', isError: true);
                                       }
                                     },
                                   ),
@@ -845,10 +1025,14 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.close, size: 16, color: AppColors.onSurfaceVariant),
-                                            onPressed: () {
-                                              setState(() => mod.lessons.removeAt(lesIdx));
-                                            },
+                                            icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.secondary),
+                                            tooltip: 'Edit / Replace Video',
+                                            onPressed: () => _showAddOrEditLessonModal(modIdx, lessonIndex: lesIdx),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                            tooltip: 'Delete Lesson & Clean Storage',
+                                            onPressed: () => _removeLesson(modIdx, lesIdx),
                                           ),
                                         ],
                                       ),

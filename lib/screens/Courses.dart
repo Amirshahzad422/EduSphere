@@ -14,6 +14,7 @@ import '../components/Filters.dart';
 import '../components/Loader.dart';
 import '../components/Button.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 class CoursesScreen extends ConsumerStatefulWidget {
   const CoursesScreen({super.key});
@@ -343,8 +344,21 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                                   course: course,
                                   isWishlisted: isWish,
                                   onTap: () => context.go('/course/${course.id}'),
-                                  onWishlistToggle: () =>
-                                      ref.read(wishlistProvider.notifier).toggleWishlist(course),
+                                  onWishlistToggle: () {
+                                    AuthGateHelper.requireAuth(
+                                      context,
+                                      ref,
+                                      actionTitle: 'Save to Wishlist',
+                                      reason: 'Sign in to save courses to your wishlist and access them anytime.',
+                                      onAuthenticated: () {
+                                        ref.read(wishlistProvider.notifier).toggleWishlist(course);
+                                        AppHelpers.showSnackBar(
+                                          context,
+                                          isWish ? 'Removed from wishlist' : 'Saved to wishlist!',
+                                        );
+                                      },
+                                    );
+                                  },
                                 );
                               },
                             );
@@ -363,8 +377,21 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                               course: course,
                               isWishlisted: isWish,
                               onTap: () => context.go('/course/${course.id}'),
-                              onWishlistToggle: () =>
-                                  ref.read(wishlistProvider.notifier).toggleWishlist(course),
+                              onWishlistToggle: () {
+                                AuthGateHelper.requireAuth(
+                                  context,
+                                  ref,
+                                  actionTitle: 'Save to Wishlist',
+                                  reason: 'Sign in to save courses to your wishlist and access them anytime.',
+                                  onAuthenticated: () {
+                                    ref.read(wishlistProvider.notifier).toggleWishlist(course);
+                                    AppHelpers.showSnackBar(
+                                      context,
+                                      isWish ? 'Removed from wishlist' : 'Saved to wishlist!',
+                                    );
+                                  },
+                                );
+                              },
                             );
                           },
                         ),

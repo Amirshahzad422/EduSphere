@@ -563,38 +563,11 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
     final user = ref.watch(authProvider);
     final isDesktop = AppHelpers.isDesktop(context);
 
-    // Fallback seed certificates if user has no Firestore certificates yet
-    final seedCertificates = [
-      CertificateModel(
-        id: 'cert_001',
-        userId: user?.id ?? 'user_demo_01',
-        userName: user?.name ?? 'Alex Morgan',
-        courseId: 'course_1',
-        courseTitle: 'Complete Flutter & Firebase Masterclass 2026',
-        instructorName: 'Alexandre Rivera',
-        verificationId: 'EDUS-849204-FLUTTER',
-        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify-certificate.edusphere-app.workers.dev/verify/EDUS-849204-FLUTTER',
-        issuedAt: DateTime.now().subtract(const Duration(days: 15)),
-      ),
-      CertificateModel(
-        id: 'cert_002',
-        userId: user?.id ?? 'user_demo_01',
-        userName: user?.name ?? 'Alex Morgan',
-        courseId: 'course_2',
-        courseTitle: 'Enterprise UI/UX Design Systems & Figma Pro',
-        instructorName: 'Marcus Vance',
-        verificationId: 'EDUS-731902-DESIGN',
-        qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://verify-certificate.edusphere-app.workers.dev/verify/EDUS-731902-DESIGN',
-        issuedAt: DateTime.now().subtract(const Duration(days: 45)),
-      ),
-    ];
-
     final userCertsAsync = ref.watch(userCertificatesStreamProvider(user?.id ?? ''));
-
     final certificates = userCertsAsync.when(
-      data: (certs) => certs.isNotEmpty ? certs : seedCertificates,
-      loading: () => seedCertificates,
-      error: (_, __) => seedCertificates,
+      data: (certs) => certs,
+      loading: () => <CertificateModel>[],
+      error: (_, __) => <CertificateModel>[],
     );
 
     return SingleChildScrollView(
@@ -788,40 +761,67 @@ class _CertificatesScreenState extends ConsumerState<CertificatesScreen> {
               ),
               const SizedBox(height: 16),
 
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final crossCount = constraints.maxWidth >= 800 ? 2 : 1;
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossCount,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: constraints.maxWidth >= 800
-                          ? 1.15
-                          : (constraints.maxWidth > 500 ? 1.05 : 0.85),
-                    ),
-                    itemCount: certificates.length,
-                    itemBuilder: (context, index) {
-                      final cert = certificates[index];
-                      return InkWell(
-                        onTap: () => _showCertificateDetailModal(cert),
-                        borderRadius: AppSpacing.roundedLg,
-                        child: CertificateCard(
-                          certificate: cert,
-                          onDownload: () => _handleDownloadPdf(cert),
-                          onShare: () {
-                            final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
-                            Clipboard.setData(ClipboardData(text: url));
-                            AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
-                          },
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              if (certificates.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppSpacing.roundedLg,
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.workspace_premium_outlined, size: 56, color: AppColors.secondary.withValues(alpha: 0.5)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No Issued Certificates Yet',
+                        style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Complete any course curriculum and quizzes with 80%+ score to generate your verified cryptographic certificate with scannable QR verification.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final crossCount = constraints.maxWidth >= 800 ? 2 : 1;
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossCount,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: constraints.maxWidth >= 800
+                            ? 1.15
+                            : (constraints.maxWidth > 500 ? 1.05 : 0.85),
+                      ),
+                      itemCount: certificates.length,
+                      itemBuilder: (context, index) {
+                        final cert = certificates[index];
+                        return InkWell(
+                          onTap: () => _showCertificateDetailModal(cert),
+                          borderRadius: AppSpacing.roundedLg,
+                          child: CertificateCard(
+                            certificate: cert,
+                            onDownload: () => _handleDownloadPdf(cert),
+                            onShare: () {
+                              final url = 'https://verify-certificate.edusphere-app.workers.dev/verify/${cert.verificationId}';
+                              Clipboard.setData(ClipboardData(text: url));
+                              AppHelpers.showSnackBar(context, 'Verification link copied to clipboard!');
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
             ],
           ),
         ),

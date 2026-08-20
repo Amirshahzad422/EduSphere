@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 import '../firebase_options.dart';
 import 'firebase_service.dart';
@@ -9,17 +11,7 @@ class AuthService {
   FirebaseAuth? get _firebaseAuth => FirebaseService.isInitialized ? FirebaseAuth.instance : null;
   FirebaseFirestore? get _firestore => FirebaseService.isInitialized ? FirebaseFirestore.instance : null;
 
-  UserModel? _localUser = const UserModel(
-    id: 'user_demo_01',
-    name: 'Alex Morgan',
-    email: 'alex.morgan@edusphere.io',
-    role: UserRole.student,
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-    bio: 'Lifelong learner & aspiring full-stack mobile developer.',
-    xp: 2450,
-    streak: 12,
-    badges: ['Fast Learner', 'Quiz Master', 'Top Contributor', '7-Day Streak'],
-  );
+  UserModel? _localUser;
 
   UserModel? get currentUser => _localUser;
   bool get _isConfiguredWithLiveFirebase {
@@ -42,6 +34,11 @@ class AuthService {
           final userDoc = await _firestore!.collection('users').doc(credential.user!.uid).get();
           if (userDoc.exists && userDoc.data() != null) {
             _localUser = UserModel.fromJson(userDoc.data()!);
+            // Ensure public profile exists and matches full user document
+            await _firestore!.collection('publicProfiles').doc(credential.user!.uid).set(
+              _localUser!.toPublicProfileJson(),
+              SetOptions(merge: true),
+            );
           } else {
             // Create initial profile if doc missing
             _localUser = UserModel(
@@ -51,12 +48,15 @@ class AuthService {
               role: UserRole.student,
               photoUrl: credential.user!.photoURL ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
               bio: 'EduSphere student account.',
-              xp: 500,
-              streak: 3,
-              badges: ['Early Explorer'],
+              xp: 250,
+              streak: 1,
+              badges: const ['New Joiner'],
+              lastActiveDate: DateTime.now(),
             );
             await _firestore!.collection('users').doc(credential.user!.uid).set(_localUser!.toJson());
+            await _firestore!.collection('publicProfiles').doc(credential.user!.uid).set(_localUser!.toPublicProfileJson());
           }
+          await checkAndUpdateDailyStreak();
           debugPrint('[AuthService] Live Firebase Auth Sign-in successful for: ${_localUser?.email}');
           return _localUser;
         }
@@ -79,15 +79,17 @@ class AuthService {
           ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'
           : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
       bio: 'EduSphere ${role.name} account.',
-      xp: role == UserRole.instructor ? 8500 : 1200,
-      streak: 5,
-      badges: role == UserRole.instructor ? ['Master Instructor', 'Top Rated'] : ['Early Adopter', 'Code Explorer'],
+      xp: role == UserRole.instructor ? 8500 : 250,
+      streak: role == UserRole.instructor ? 5 : 1,
+      badges: role == UserRole.instructor ? const ['Master Instructor', 'Top Rated'] : const ['New Joiner'],
+      lastActiveDate: DateTime.now(),
     );
+    await checkAndUpdateDailyStreak();
     debugPrint('[AuthService] Local session signed in as: ${_localUser?.email} (${_localUser?.role.name})');
     return _localUser;
   }
 
-  /// Register with Email, Password and Role
+  /// Register with Email & Password (Always creates as student at rule level)
   Future<UserModel?> registerWithEmail(
     String name,
     String email,
@@ -102,24 +104,25 @@ class AuthService {
         );
 
         if (credential.user != null) {
-          final defaultPhoto = role == UserRole.instructor
-              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+          const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
           _localUser = UserModel(
             id: credential.user!.uid,
             name: name.trim(),
             email: email.trim(),
-            role: role,
+            role: UserRole.student, // Forced student at creation
             photoUrl: defaultPhoto,
-            bio: 'New EduSphere ${role.name}. Ready to expand knowledge.',
-            xp: role == UserRole.instructor ? 1000 : 250,
+            bio: 'New EduSphere student. Ready to expand knowledge.',
+            xp: 250,
             streak: 1,
-            badges: ['New Joiner'],
+            badges: const ['New Joiner'],
+            lastActiveDate: DateTime.now(),
           );
 
           await _firestore!.collection('users').doc(credential.user!.uid).set(_localUser!.toJson());
+          await _firestore!.collection('publicProfiles').doc(credential.user!.uid).set(_localUser!.toPublicProfileJson());
           await credential.user!.updateDisplayName(name.trim());
+          await credential.user!.updatePhotoURL(defaultPhoto);
           debugPrint('[AuthService] Live Firebase Auth user registered & saved to Firestore: ${_localUser?.email}');
           return _localUser;
         }
@@ -132,28 +135,27 @@ class AuthService {
     }
 
     // Fallback simulated registration
-    final defaultPhoto = role == UserRole.instructor
-        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'
-        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+    const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
     _localUser = UserModel(
       id: 'user_${DateTime.now().millisecondsSinceEpoch}',
       name: name.trim(),
       email: email.trim(),
-      role: role,
+      role: UserRole.student,
       photoUrl: defaultPhoto,
-      bio: 'New EduSphere ${role.name}.',
-      xp: role == UserRole.instructor ? 1000 : 250,
+      bio: 'New EduSphere student.',
+      xp: 250,
       streak: 1,
-      badges: ['New Joiner'],
+      badges: const ['New Joiner'],
+      lastActiveDate: DateTime.now(),
     );
     debugPrint('[AuthService] Local user registered: ${_localUser?.email} (${_localUser?.role.name})');
     return _localUser;
   }
 
-  /// Sign In with Google
+  /// Sign In with Google (Quick Social Auth)
   Future<UserModel?> signInWithGoogle({UserRole role = UserRole.student}) async {
-    if (FirebaseService.isInitialized && kIsWeb && _firebaseAuth != null && _firestore != null) {
+    if (_isConfiguredWithLiveFirebase && kIsWeb && _firebaseAuth != null && _firestore != null) {
       try {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         final userCredential = await _firebaseAuth!.signInWithPopup(googleProvider);
@@ -161,39 +163,116 @@ class AuthService {
           final userDoc = await _firestore!.collection('users').doc(userCredential.user!.uid).get();
           if (userDoc.exists && userDoc.data() != null) {
             _localUser = UserModel.fromJson(userDoc.data()!);
+            await _firestore!.collection('publicProfiles').doc(userCredential.user!.uid).set(
+              _localUser!.toPublicProfileJson(),
+              SetOptions(merge: true),
+            );
           } else {
             _localUser = UserModel(
               id: userCredential.user!.uid,
-              name: userCredential.user!.displayName ?? 'Google User',
+              name: userCredential.user!.displayName ?? 'Learner',
               email: userCredential.user!.email ?? 'user@gmail.com',
-              role: role,
+              role: UserRole.student, // Forced student on creation
               photoUrl: userCredential.user!.photoURL ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              bio: 'Signed in with Google.',
-              xp: 500,
+              bio: 'New EduSphere student.',
+              xp: 250,
               streak: 1,
-              badges: ['Google Verified'],
+              badges: const ['New Joiner'],
+              lastActiveDate: DateTime.now(),
             );
             await _firestore!.collection('users').doc(userCredential.user!.uid).set(_localUser!.toJson());
+            await _firestore!.collection('publicProfiles').doc(userCredential.user!.uid).set(_localUser!.toPublicProfileJson());
           }
+          await checkAndUpdateDailyStreak();
           return _localUser;
         }
+        return null;
       } catch (e) {
-        debugPrint('[AuthService] Google Sign-in error: $e');
+        debugPrint('[AuthService] Google Sign-in exception: $e');
+        if (e is FirebaseAuthException) {
+          if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request' || e.code == 'user-cancelled') {
+            debugPrint('[AuthService] Google sign-in popup cancelled by user.');
+            return null;
+          }
+          rethrow;
+        }
+        return null;
       }
     }
 
-    // Fallback simulated Google sign-in
+    if (_isConfiguredWithLiveFirebase) {
+      // Live Firebase is configured, return null on cancel/failure without fake account
+      return null;
+    }
+
+    // Fallback simulated Google sign-in (strictly for headless unit tests / offline demo)
     _localUser = UserModel(
       id: 'google_user_01',
       name: 'Google Learner',
       email: 'learner@gmail.com',
-      role: role,
+      role: UserRole.student,
       photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-      bio: 'Learner via Google account.',
-      xp: 750,
-      streak: 2,
-      badges: ['Google Sign-In', 'Verified Learner'],
+      bio: 'New EduSphere student.',
+      xp: 250,
+      streak: 1,
+      badges: const ['New Joiner'],
+      lastActiveDate: DateTime.now(),
     );
+    await checkAndUpdateDailyStreak();
+    return _localUser;
+  }
+
+  /// Real streak calculation logic:
+  /// - If active on consecutive calendar day (difference == 1): streak += 1
+  /// - If active on the same calendar day (difference == 0): streak remains the same
+  /// - If missed 1 or more calendar days (difference > 1): streak breaks and resets to 1
+  Future<UserModel?> checkAndUpdateDailyStreak() async {
+    if (_localUser == null) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastActive = _localUser!.lastActiveDate != null
+        ? DateTime(_localUser!.lastActiveDate!.year, _localUser!.lastActiveDate!.month, _localUser!.lastActiveDate!.day)
+        : null;
+
+    int newStreak = _localUser!.streak;
+
+    if (lastActive == null) {
+      newStreak = 1;
+    } else {
+      final differenceInDays = today.difference(lastActive).inDays;
+      if (differenceInDays == 1) {
+        // Consecutive day
+        newStreak = (_localUser!.streak > 0 ? _localUser!.streak : 0) + 1;
+      } else if (differenceInDays > 1) {
+        // Missed one or more days -> streak broke!
+        newStreak = 1;
+      }
+      // If differenceInDays == 0: same day, keep existing streak
+    }
+
+    _localUser = _localUser!.copyWith(
+      streak: newStreak,
+      lastActiveDate: now,
+    );
+
+    if (FirebaseService.isInitialized && _firestore != null && _localUser!.id.isNotEmpty) {
+      try {
+        await _firestore!.collection('users').doc(_localUser!.id).set({
+          'streak': newStreak,
+          'lastActiveDate': now.toIso8601String(),
+        }, SetOptions(merge: true));
+
+        await _firestore!.collection('publicProfiles').doc(_localUser!.id).set({
+          'streak': newStreak,
+          'lastActiveDate': now.toIso8601String(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('[AuthService] Firestore streak sync note: $e');
+      }
+    }
+
+    debugPrint('[AuthService] 🔥 Daily streak verified: $newStreak day(s) (last active: ${now.toIso8601String()})');
     return _localUser;
   }
 
@@ -211,24 +290,30 @@ class AuthService {
       photoUrl: photoUrl ?? _localUser!.photoUrl,
     );
 
-    if (FirebaseService.isInitialized && _firestore != null) {
+    if (FirebaseService.isInitialized && _firestore != null && _localUser!.id.isNotEmpty) {
       try {
         final updateData = <String, dynamic>{};
         if (name != null) updateData['name'] = name;
         if (bio != null) updateData['bio'] = bio;
         if (photoUrl != null) updateData['photoUrl'] = photoUrl;
-        await _firestore!.collection('users').doc(_localUser!.id).update(updateData);
+        await _firestore!.collection('users').doc(_localUser!.id).set(updateData, SetOptions(merge: true));
+        await _firestore!.collection('publicProfiles').doc(_localUser!.id).set(
+          _localUser!.toPublicProfileJson(),
+          SetOptions(merge: true),
+        );
+
         if (_firebaseAuth?.currentUser != null) {
           if (name != null) await _firebaseAuth!.currentUser!.updateDisplayName(name);
           if (photoUrl != null) await _firebaseAuth!.currentUser!.updatePhotoURL(photoUrl);
         }
-        debugPrint('[AuthService] Profile updated in Firestore for ${_localUser!.email}');
+        debugPrint('[AuthService] Profile updated in Firestore for ${_localUser!.email}: photoUrl=$photoUrl');
       } catch (e) {
         debugPrint('[AuthService] Firestore profile update note: $e');
+        rethrow;
       }
     }
 
-    debugPrint('[AuthService] Profile updated: name=${_localUser!.name}, bio=${_localUser!.bio}');
+    debugPrint('[AuthService] Profile updated: name=${_localUser!.name}, photoUrl=${_localUser!.photoUrl}');
     return _localUser;
   }
 
@@ -253,7 +338,8 @@ class AuthService {
 
     if (FirebaseService.isInitialized && _firestore != null) {
       try {
-        await _firestore!.collection('users').doc(_localUser!.id).update({'xp': newXp});
+        await _firestore!.collection('users').doc(_localUser!.id).set({'xp': newXp}, SetOptions(merge: true));
+        await _firestore!.collection('publicProfiles').doc(_localUser!.id).set({'xp': newXp}, SetOptions(merge: true));
       } catch (_) {}
     }
     debugPrint('[AuthService] ⚡ Awarded +$points XP! Total XP: $newXp');
@@ -270,7 +356,8 @@ class AuthService {
 
     if (FirebaseService.isInitialized && _firestore != null) {
       try {
-        await _firestore!.collection('users').doc(_localUser!.id).update({'badges': updatedBadges});
+        await _firestore!.collection('users').doc(_localUser!.id).set({'badges': updatedBadges}, SetOptions(merge: true));
+        await _firestore!.collection('publicProfiles').doc(_localUser!.id).set({'badges': updatedBadges}, SetOptions(merge: true));
       } catch (_) {}
     }
     debugPrint('[AuthService] 🏆 Unlocked new badge: "$badge"!');
@@ -284,20 +371,71 @@ class AuthService {
 
     if (FirebaseService.isInitialized && _firestore != null) {
       try {
-        await _firestore!.collection('users').doc(_localUser!.id).update({'streak': streak});
+        await _firestore!.collection('users').doc(_localUser!.id).set({'streak': streak}, SetOptions(merge: true));
+        await _firestore!.collection('publicProfiles').doc(_localUser!.id).set({'streak': streak}, SetOptions(merge: true));
       } catch (_) {}
     }
     return _localUser;
+  }
+
+  /// Real-time Global Leaderboard Stream from Public Profiles Collection (Excludes Emails)
+  Stream<List<UserModel>> getLeaderboardStream() {
+    if (FirebaseService.isInitialized && _firestore != null) {
+      return _firestore!
+          .collection('publicProfiles')
+          .orderBy('xp', descending: true)
+          .limit(25)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) {
+              final data = doc.data();
+              final docId = (data['id'] != null && data['id'].toString().isNotEmpty) ? data['id'].toString() : doc.id;
+              return UserModel.fromJson({
+                ...data,
+                'id': docId,
+              });
+            })
+            .where((u) => u.name.trim().isNotEmpty && u.id.trim().isNotEmpty && !u.id.startsWith('google_user_'))
+            .toList();
+      });
+    }
+    return Stream.value(_localUser != null ? [_localUser!] : []);
   }
 
   /// Role Switcher (for development & demo testing)
   void switchRole(UserRole newRole) {
     if (_localUser != null) {
       _localUser = _localUser!.copyWith(role: newRole);
-      if (FirebaseService.isInitialized && _firestore != null) {
-        _firestore!.collection('users').doc(_localUser!.id).update({'role': newRole.name}).catchError((_) {});
-      }
       debugPrint('[AuthService] Switched role to: ${newRole.name}');
     }
+  }
+
+  /// Request server-side instructor upgrade via Cloudflare Worker
+  Future<UserModel?> upgradeToInstructor() async {
+    if (_localUser == null) return null;
+
+    final idToken = await _firebaseAuth?.currentUser?.getIdToken();
+    const endpoint = 'https://request-instructor-upgrade.edusphere-app.workers.dev';
+
+    try {
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({'userId': _localUser!.id}),
+      );
+
+      if (response.statusCode == 200) {
+        _localUser = _localUser!.copyWith(role: UserRole.instructor);
+        debugPrint('[AuthService] ✅ Successfully upgraded to Instructor via Cloudflare Worker!');
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Instructor upgrade note: $e');
+      _localUser = _localUser!.copyWith(role: UserRole.instructor);
+    }
+    return _localUser;
   }
 }

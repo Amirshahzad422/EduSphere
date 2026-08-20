@@ -44,6 +44,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   bool _hasSeeked = false;
   bool _isLoadingUrl = false;
 
+  bool _hasCompleted = false;
+
   final List<double> _speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
 
   @override
@@ -60,7 +62,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (oldWidget.isLoadingUrl != widget.isLoadingUrl) {
       _isLoadingUrl = widget.isLoadingUrl;
     }
-    if (oldWidget.videoUrl != widget.videoUrl || oldWidget.title != widget.title) {
+    // Only re-initialize when videoUrl actually changes
+    if (oldWidget.videoUrl != widget.videoUrl && widget.videoUrl.isNotEmpty) {
       _currentSeconds = widget.initialPositionSeconds.clamp(0, widget.totalDurationSeconds);
       _errorMessage = null;
       _initializePlayer();
@@ -69,6 +72,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   Future<void> _initializePlayer() async {
     _hasSeeked = false;
+    _hasCompleted = false;
     _isLoadingUrl = true;
 
     debugPrint('================================================================');
@@ -144,7 +148,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
     final controller = _controller!;
 
-    // ISSUE 1: One-time seek only after initialized AND not buffering
+    // One-time seek only after initialized AND not buffering
     if (!_hasSeeked &&
         controller.value.isInitialized &&
         !controller.value.isBuffering &&
@@ -166,7 +170,6 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     final durSec = controller.value.duration.inSeconds;
     final isPlaying = controller.value.isPlaying;
 
-    // ISSUE 2: If real controller resumes playing after buffer, cancel fallback timer immediately
     if (isPlaying) {
       _fallbackTimer?.cancel();
     }
@@ -176,12 +179,14 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         _currentSeconds = posSec;
         _isPlaying = isPlaying;
       });
-      if (posSec % 3 == 0) {
+      if (posSec % 5 == 0 && isPlaying) {
         widget.onPositionChanged?.call(posSec);
       }
     }
 
-    if (durSec > 0 && posSec >= durSec && !isPlaying) {
+    // Trigger onComplete strictly once when video finishes playing
+    if (durSec > 0 && posSec >= durSec && !isPlaying && !_hasCompleted) {
+      _hasCompleted = true;
       widget.onComplete?.call();
     }
   }

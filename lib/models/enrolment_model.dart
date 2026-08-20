@@ -3,6 +3,7 @@ class EnrolmentModel {
   final String userId;
   final String courseId;
   final double progress; // 0.0 to 1.0
+  final bool isCompleted;
   final List<String> completedLessons;
   final String paymentId;
   final DateTime enrolledAt;
@@ -16,6 +17,7 @@ class EnrolmentModel {
     required this.userId,
     required this.courseId,
     this.progress = 0.0,
+    this.isCompleted = false,
     this.completedLessons = const [],
     this.paymentId = 'free_enrolment',
     required this.enrolledAt,
@@ -26,11 +28,14 @@ class EnrolmentModel {
   });
 
   factory EnrolmentModel.fromJson(Map<String, dynamic> json) {
+    final prog = (json['progress'] as num?)?.toDouble() ?? 0.0;
+    final isComp = (json['isCompleted'] as bool?) ?? (prog >= 1.0);
     return EnrolmentModel(
       id: json['id'] as String? ?? '',
       userId: json['userId'] as String? ?? '',
       courseId: json['courseId'] as String? ?? '',
-      progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
+      progress: prog,
+      isCompleted: isComp,
       completedLessons: (json['completedLessons'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -60,6 +65,7 @@ class EnrolmentModel {
       'userId': userId,
       'courseId': courseId,
       'progress': progress,
+      'isCompleted': isCompleted || progress >= 1.0,
       'completedLessons': completedLessons,
       'paymentId': paymentId,
       'enrolledAt': enrolledAt.toIso8601String(),
@@ -75,6 +81,7 @@ class EnrolmentModel {
     String? userId,
     String? courseId,
     double? progress,
+    bool? isCompleted,
     List<String>? completedLessons,
     String? paymentId,
     DateTime? enrolledAt,
@@ -88,6 +95,7 @@ class EnrolmentModel {
       userId: userId ?? this.userId,
       courseId: courseId ?? this.courseId,
       progress: progress ?? this.progress,
+      isCompleted: isCompleted ?? this.isCompleted,
       completedLessons: completedLessons ?? this.completedLessons,
       paymentId: paymentId ?? this.paymentId,
       enrolledAt: enrolledAt ?? this.enrolledAt,

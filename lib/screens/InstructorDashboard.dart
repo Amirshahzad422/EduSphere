@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../models/user_model.dart';
+import '../models/course_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/course_provider.dart';
+import '../providers/review_provider.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
@@ -19,6 +22,7 @@ class InstructorDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider);
     final coursesAsync = ref.watch(allCoursesProvider);
+    final liveCoursesAsync = ref.watch(instructorCoursesRealtimeStreamProvider(user?.id ?? ''));
     final isDesktop = AppHelpers.isDesktop(context);
 
     return SingleChildScrollView(
@@ -202,30 +206,37 @@ class InstructorDashboardScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: 24),
 
-              coursesAsync.when(
-                data: (allCourses) {
-                  // Filter strictly to courses created by this instructor
-                  final myCourses = allCourses.where((c) {
-                    if (user == null) return false;
-                    final matchId = c.instructorId == user.id;
-                    final matchName = c.instructor.name.toLowerCase().trim() == user.name.toLowerCase().trim();
-                    return matchId || matchName;
-                  }).toList();
+              liveCoursesAsync.when(
+                data: (liveCourses) {
+                  // If realtime stream has data, use it; otherwise fallback to allCoursesProvider
+                  final List<CourseModel> myCourses = liveCourses.isNotEmpty
+                      ? liveCourses
+                      : (coursesAsync.asData?.value ?? []).where((c) {
+                          if (user == null) return false;
+                          final matchId = c.instructorId == user.id;
+                          final matchName = c.instructor.name.toLowerCase().trim() == user.name.toLowerCase().trim();
+                          return matchId || matchName;
+                        }).toList();
 
-                  // REAL DATA CALCULATIONS - NO FAKE FALLBACK FIGURES
+                  // REAL DATA CALCULATIONS - STRICTLY BASED ON ENROLLED STUDENTS & EFFECTIVE DISCOUNTED PRICE
                   final totalStudents = myCourses.fold<int>(0, (sum, c) => sum + c.enrolmentCount);
-                  final totalRevenue = myCourses.fold<double>(0, (sum, c) => sum + (c.enrolmentCount * c.price * 0.85));
+                  final totalRevenue = myCourses.fold<double>(0, (sum, c) => sum + c.instructorRevenue);
+                  final totalGross = myCourses.fold<double>(0, (sum, c) => sum + c.grossSales);
+                  final totalReviews = myCourses.fold<int>(0, (sum, c) => sum + c.reviewCount);
                   final avgRating = myCourses.isNotEmpty
                       ? (myCourses.fold<double>(0, (sum, c) => sum + c.rating) / myCourses.length)
                       : 0.0;
+                  final courseIds = myCourses.map((c) => c.id).toList();
 
                   final kpiCards = [
                     _KpiCard(
-                      title: 'Total Earnings',
+                      title: 'Total Earnings (85%)',
                       value: AppFormatters.formatCurrency(totalRevenue),
                       icon: Icons.monetization_on,
                       iconColor: AppColors.success,
-                      trend: myCourses.isNotEmpty ? '${myCourses.length} active courses' : '0 published courses',
+                      trend: myCourses.isNotEmpty
+                          ? 'Gross sales: ${AppFormatters.formatCurrency(totalGross)}'
+                          : '0 published courses',
                       onTap: () => context.go('/earnings'),
                     ),
                     _KpiCard(
@@ -233,14 +244,14 @@ class InstructorDashboardScreen extends ConsumerWidget {
                       value: AppFormatters.formatCount(totalStudents),
                       icon: Icons.people,
                       iconColor: AppColors.secondary,
-                      trend: myCourses.isNotEmpty ? 'Enrolled in your courses' : 'No students yet',
+                      trend: myCourses.isNotEmpty ? '$totalStudents active registrations' : 'No students yet',
                     ),
                     _KpiCard(
                       title: 'Average Rating',
                       value: myCourses.isNotEmpty ? '${avgRating.toStringAsFixed(1)} ★' : '0.0 ★',
                       icon: Icons.star,
                       iconColor: AppColors.star,
-                      trend: myCourses.isNotEmpty ? 'Based on student ratings' : 'No ratings yet',
+                      trend: totalReviews > 0 ? '$totalReviews student reviews' : 'Real-time live metric',
                     ),
                   ];
 
@@ -366,7 +377,7 @@ class InstructorDashboardScreen extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(
-                                  '${course.category} • ${AppFormatters.formatCount(course.enrolmentCount)} students • ${AppFormatters.formatCurrency(course.price)}',
+                                  '${course.category} • ${AppFormatters.formatCount(course.enrolmentCount)} students • ${course.rating.toStringAsFixed(1)} ★ (${course.reviewCount}) • ${AppFormatters.formatCurrency(course.effectivePrice)}${course.discount > 0 ? ' (${course.discount.round()}% OFF)' : ''} • Earned: ${AppFormatters.formatCurrency(course.instructorRevenue)}',
                                   style: AppTypography.bodySmall,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -390,6 +401,11 @@ class InstructorDashboardScreen extends ConsumerWidget {
                             },
                           ),
                         ),
+
+                      const SizedBox(height: 32),
+
+                      // Live Student Reviews Feed
+                      _buildLiveReviewsSection(context, ref, courseIds, myCourses),
                     ],
                   );
                 },
@@ -400,6 +416,192 @@ class InstructorDashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLiveReviewsSection(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> courseIds,
+    List<CourseModel> myCourses,
+  ) {
+    if (courseIds.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final reviewsAsync = ref.watch(instructorReviewsStreamProvider(courseIds));
+    final courseMap = {for (final c in myCourses) c.id: c.title};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Student Reviews & Feedback',
+              style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.12),
+                borderRadius: AppSpacing.roundedSm,
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt, size: 14, color: AppColors.success),
+                  const SizedBox(width: 4),
+                  Text(
+                    'LIVE FEED',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        reviewsAsync.when(
+          data: (reviews) {
+            if (reviews.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppSpacing.roundedLg,
+                  border: Border.all(color: AppColors.surfaceContainerHigh),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.rate_review_outlined, size: 36, color: AppColors.outline.withOpacity(0.5)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No reviews received yet',
+                        style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Student ratings submitted on your masterclasses will appear here instantly.',
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppSpacing.roundedLg,
+                border: Border.all(color: AppColors.surfaceContainerHigh),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reviews.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                itemBuilder: (context, index) {
+                  final review = reviews[index];
+                  final courseTitle = courseMap[review.courseId] ?? 'Masterclass';
+                  final formattedDate = DateFormat('MMM dd, yyyy • hh:mm a').format(review.updatedAt);
+
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.secondary.withOpacity(0.1),
+                              backgroundImage: review.userPhotoUrl.isNotEmpty ? NetworkImage(review.userPhotoUrl) : null,
+                              child: review.userPhotoUrl.isEmpty
+                                  ? Text(
+                                      review.userName.isNotEmpty ? review.userName[0].toUpperCase() : 'S',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    review.userName,
+                                    style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    formattedDate,
+                                    style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 10),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.star.withOpacity(0.12),
+                                borderRadius: AppSpacing.roundedSm,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star_rounded, size: 14, color: AppColors.star),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    review.rating.toStringAsFixed(1),
+                                    style: AppTypography.labelSmall.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.star,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(review.reviewText, style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: AppSpacing.roundedSm,
+                          ),
+                          child: Text(
+                            'Course: $courseTitle',
+                            style: AppTypography.labelSmall.copyWith(color: AppColors.secondary, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+          loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())),
+          error: (err, _) => Text('Error loading reviews: $err', style: const TextStyle(color: AppColors.error)),
+        ),
+      ],
     );
   }
 }
@@ -439,14 +641,31 @@ class _KpiCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: AppTypography.labelMedium.copyWith(color: AppColors.outline)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.outline),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Icon(icon, color: iconColor, size: 22),
               ],
             ),
             const SizedBox(height: 10),
-            Text(value, style: AppTypography.headlineMedium.copyWith(fontWeight: FontWeight.w800)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: AppTypography.headlineMedium.copyWith(fontWeight: FontWeight.w800)),
+            ),
             const SizedBox(height: 4),
-            Text(trend, style: AppTypography.labelSmall.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600)),
+            Text(
+              trend,
+              style: AppTypography.labelSmall.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

@@ -15,35 +15,7 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
 
   EnrolmentNotifier([this._ref, CourseService? courseService])
       : _courseService = courseService ?? CourseService(),
-        super([
-          EnrolmentModel(
-            id: 'user_demo_01_course_1',
-            userId: 'user_demo_01',
-            courseId: 'course_1',
-            progress: 0.45,
-            completedLessons: ['les_1_1_1'],
-            lastLessonId: 'les_1_1_2',
-            lastPlayedPositions: {'les_1_1_1': 330, 'les_1_1_2': 252},
-            lessonNotes: {
-              'les_1_1_1': 'Key takeaway: Declarative UI state trees prevent race conditions.',
-              'les_1_1_2': 'Remember to implement clean repository patterns for offline caching.',
-            },
-            enrolledAt: DateTime.now().subtract(const Duration(days: 4)),
-            lastAccessedAt: DateTime.now().subtract(const Duration(hours: 3)),
-          ),
-          EnrolmentModel(
-            id: 'user_demo_01_course_3',
-            userId: 'user_demo_01',
-            courseId: 'course_3',
-            progress: 0.20,
-            completedLessons: ['les_3_1_1'],
-            lastLessonId: 'les_3_1_1',
-            lastPlayedPositions: {'les_3_1_1': 140},
-            lessonNotes: {},
-            enrolledAt: DateTime.now().subtract(const Duration(days: 10)),
-            lastAccessedAt: DateTime.now().subtract(const Duration(days: 1)),
-          ),
-        ]);
+        super([]);
 
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
 
@@ -129,7 +101,11 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
     // Record enrollment in CourseService so instructor revenue, student count, and catalogue stats update live
     await _courseService.recordEnrolment(courseId);
     if (_ref != null) {
-      _ref.read(courseRefreshCounterProvider.notifier).state++;
+      Future.microtask(() {
+        try {
+          _ref.read(courseRefreshCounterProvider.notifier).state++;
+        } catch (_) {}
+      });
     }
 
     // Persist to Cloud Firestore if connected
@@ -190,39 +166,58 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
     }).toList();
   }
 
-  void completeLesson(String courseId, String lessonId, int totalLessons, {String? courseTitle, String? instructorName}) {
-    state = state.map((enrol) {
+  bool completeLesson(String courseId, String lessonId, int totalLessons, {String? courseTitle, String? instructorName}) {
+    bool isNewlyCompleted = false;
+    bool courseNewlyFinished = false;
+
+    final updatedState = <EnrolmentModel>[];
+    for (final enrol in state) {
       if (enrol.courseId == courseId) {
         final currentCompleted = List<String>.from(enrol.completedLessons);
         final wasNotCompleted = !currentCompleted.contains(lessonId);
+
         if (wasNotCompleted) {
           currentCompleted.add(lessonId);
-          // Award +50 XP for completing a lesson
-          _ref?.read(authProvider.notifier).addXp(50);
+          isNewlyCompleted = true;
         }
+
         final newProgress = totalLessons > 0 ? (currentCompleted.length / totalLessons).clamp(0.0, 1.0) : 0.0;
+        final willBeCompleted = newProgress >= 1.0;
+
+        if (willBeCompleted && !enrol.isCompleted && enrol.progress < 1.0) {
+          courseNewlyFinished = true;
+        }
+
         final updatedEnrol = enrol.copyWith(
           completedLessons: currentCompleted,
           progress: newProgress,
+          isCompleted: enrol.isCompleted || willBeCompleted,
           lastLessonId: lessonId,
           lastAccessedAt: DateTime.now(),
         );
 
-        // If completed 100% of the course for the first time
-        if (newProgress >= 1.0 && enrol.progress < 1.0) {
-          _ref?.read(authProvider.notifier).addXp(500);
-          _ref?.read(authProvider.notifier).awardBadge('Mastery Graduate');
-          final user = _ref?.read(authProvider);
-          if (user != null) {
-            _courseService.recordCourseRating(courseId, 5.0).catchError((_) {});
-          }
-        }
-
         _syncEnrolmentToFirestore(updatedEnrol);
-        return updatedEnrol;
+        updatedState.add(updatedEnrol);
+      } else {
+        updatedState.add(enrol);
       }
-      return enrol;
-    }).toList();
+    }
+    state = updatedState;
+
+    // Award XP and badges strictly once outside the iteration
+    if (isNewlyCompleted) {
+      _ref?.read(authProvider.notifier).addXp(50);
+    }
+    if (courseNewlyFinished) {
+      _ref?.read(authProvider.notifier).addXp(500);
+      _ref?.read(authProvider.notifier).awardBadge('Mastery Graduate');
+      final user = _ref?.read(authProvider);
+      if (user != null) {
+        _courseService.recordCourseRating(courseId, 5.0).catchError((_) {});
+      }
+    }
+
+    return isNewlyCompleted;
   }
 
   void _syncEnrolmentToFirestore(EnrolmentModel enrolment) {

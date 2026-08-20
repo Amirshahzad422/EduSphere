@@ -133,6 +133,24 @@ class CloudinaryUploadService {
     );
   }
 
+  /// Uploads a user profile photo to Cloudinary (resource_type: image, public mode).
+  Future<CloudinaryUploadResult> uploadProfilePhoto({
+    required String userId,
+    required String fileName,
+    required Uint8List fileBytes,
+    UploadProgressCallback? onProgress,
+  }) async {
+    return _uploadFile(
+      resourceType: 'image',
+      folderPath: 'profiles/$userId',
+      customPublicId: 'profiles/$userId/avatar_${DateTime.now().millisecondsSinceEpoch}',
+      fileName: fileName,
+      fileBytes: fileBytes,
+      isPreview: true, // Public access mode for avatars
+      onProgress: onProgress,
+    );
+  }
+
   /// Core implementation handling direct single-part or chunked multipart upload.
   Future<CloudinaryUploadResult> _uploadFile({
     required String resourceType,
@@ -297,5 +315,46 @@ class CloudinaryUploadService {
 
     debugPrint('[CloudinaryUploadService] ✅ Chunked upload completed: public_id=${finalResult.publicId}');
     return finalResult;
+  }
+
+  /// Safely deletes an asset from Cloudinary storage via Cloudflare Worker
+  Future<bool> deleteCloudinaryAsset({
+    required String publicId,
+    String? courseId,
+    String resourceType = 'video',
+    String? idToken,
+  }) async {
+    if (publicId.isEmpty) return false;
+
+    debugPrint('[CloudinaryUploadService] 🗑️ Requesting deletion of asset $publicId ($resourceType)...');
+
+    try {
+      final workerUrl = Uri.parse('https://delete-cloudinary-asset.edusphere-app.workers.dev');
+      final token = idToken ?? 'test_instructor_token';
+
+      final res = await _client.post(
+        workerUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'publicId': publicId,
+          'courseId': courseId,
+          'resourceType': resourceType,
+        }),
+      );
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        debugPrint('[CloudinaryUploadService] ✅ Cloudinary asset deleted successfully: $publicId');
+        return true;
+      } else {
+        debugPrint('[CloudinaryUploadService] ⚠️ Deletion warning from worker: ${res.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('[CloudinaryUploadService] ⚠️ Deletion error: $e');
+      return false;
+    }
   }
 }

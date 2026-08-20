@@ -17,6 +17,7 @@ import '../components/Loader.dart';
 import '../components/jitsi_embed.dart';
 import '../services/notification_service.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
@@ -289,34 +290,55 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'You must be enrolled in "${course?.title ?? 'this course'}" to join this live interactive class.',
+                      user == null
+                          ? 'Sign in with your enrolled student account to join this live interactive class.'
+                          : 'You must be enrolled in "${course?.title ?? 'this course'}" to join this live interactive class.',
                       textAlign: TextAlign.center,
                       style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => context.go('/courses'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
+                    if (user == null)
+                      AppButton(
+                        label: 'Sign In to Join Class',
+                        variant: ButtonVariant.primary,
+                        isFullWidth: true,
+                        icon: Icons.login,
+                        onPressed: () {
+                          AuthGateHelper.requireAuth(
+                            context,
+                            ref,
+                            actionTitle: 'Join Live Class',
+                            reason: 'Sign in to access interactive live sessions and real-time chat.',
+                            onAuthenticated: () {
+                              _joinSession();
+                            },
+                          );
+                        },
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => context.go('/courses'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
+                              ),
+                              child: const Text('Browse Courses'),
                             ),
-                            child: const Text('Browse Courses'),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: AppButton(
-                            label: 'View Course',
-                            variant: ButtonVariant.primary,
-                            size: ButtonSize.md,
-                            onPressed: () => context.go('/course/${liveClass.courseId}'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppButton(
+                              label: 'View Course',
+                              variant: ButtonVariant.primary,
+                              size: ButtonSize.md,
+                              onPressed: () => context.go('/course/${liveClass.courseId}'),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),

@@ -1,0 +1,12 @@
+{
+  "name": "request-instructor-upgrade",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker to securely promote a verified student to instructor in Firestore",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "firebase-auth-cloudflare-workers": "^1.2.0"
+  }
+}

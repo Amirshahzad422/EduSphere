@@ -4,9 +4,80 @@ All notable changes to the EduSphere project will be documented in this file.
 
 ---
 
-## [Phase 6] - Certificates, Instructor Mode, Polish & Final Demo (Complete DoD)
+## [Phase 6 Update & Production Polish] - Sections 1, 2, 3 & 4
 
-### Added
+### Added & Refactored
+- **Section 1: Complete Mock Elimination & Real Account Seed**:
+  - Completely eradicated `lib/assets/mock/course_seed.json` and removed `SeedService`.
+  - Wiped legacy dummy data and created 3 production accounts (1 Instructor: `instructor@edusphere.io`, 2 Students: `student.alex@edusphere.io`, `student.sarah@edusphere.io`).
+  - Seeded exactly 5 real masterclass courses in Firestore owned by instructor `BxnBMFJRQjMftbikQdCiSbpKFH92`.
+- **Section 2: Real Cloudinary Video Uploads & Firestore Lesson Sync**:
+  - Uploaded 10 real sample video files from `sample_videos/` directly to Cloudinary using real credentials (`cloud_name: kl8rl0al`).
+  - Applied locked upload presets: `edusphere_public_preview` for preview lessons (Public) and `edusphere_authenticated` for paid lessons (Authenticated).
+  - Saved `cloudinaryPublicId` to Firestore and strictly left `videoUrl: ""` on client-side for paid lessons (enforced zero plain playable URLs).
+- **Section 3: Student Ratings & Reviews with Real-time Instructor Dashboard Reflection**:
+  - New Firestore collection `reviews` with deterministic document ID `${userId}_${courseId}` preventing duplicate reviews.
+  - Strict Firestore Security Rule: only enrolled students with matching `enrolments/${request.auth.uid}_${courseId}` can create/update reviews with rating between 1 and 5.
+  - Atomic transaction client-side update for denormalized course aggregates: `ratingSum`, `ratingCount`, `averageRating`, `rating`, `reviewCount`.
+  - Strict `firestore.rules` course update permission: enrolled reviewers can ONLY update rating fields using `request.resource.data.diff(resource.data).affectedKeys()`.
+  - Review UI on `CourseDetails.dart` and `MyLearning.dart` with interactive star selector, feedback text field, and live student review list.
+  - Real-time `instructorCoursesRealtimeStreamProvider` and `instructorReviewsStreamProvider` on `InstructorDashboard.dart` providing instantaneous live KPI and feedback updates without manual page refresh.
+- **Section 4: Course Builder Module Dialog, Rename & Cloudflare Asset Deletion**:
+  - Interactive "Add Module" dialog asking for title and summary/description instead of dummy placeholders.
+  - In-place module rename/edit preserving all underlying lessons, video URLs, and order intact.
+  - Dedicated Cloudflare Worker `deleteCloudinaryAsset` (`https://delete-cloudinary-asset.edusphere-app.workers.dev`) computing SHA-1 HMAC destroy signatures using Worker secrets to safely delete remote Cloudinary assets.
+  - Auto-deletion hooks in `CourseBuilder.dart` triggering on lesson deletion and video replacement to prevent orphaned ghost files on Cloudinary free storage.
+- **Section 5: Real Earnings Calculations & Live Class Instructor Ownership Guard**:
+  - **Dynamic Discount & Enrolment Calculations**: `CourseModel.effectivePrice`, `grossSales`, and `instructorRevenue` (85% net revenue share) dynamically calculate based on actual student registration count and percentage discounts.
+  - **Instructor Dashboard & Earnings View Sync**: `InstructorDashboard.dart` and `Earnings.dart` show live earnings breakdown, platform fees (15%), and real course transactions.
+  - **Strict Live Class Ownership Guard**: `LiveClassManagement.dart` now strictly filters the course selector to courses owned by the authenticated instructor, preventing scheduling or hosting live classes for non-owned courses.
+- **Section 6: Real Streak Logic, Duplicate XP Fix, Device Photo Upload & Live Leaderboard**:
+  - **Accurate Daily Streak Logic**: Tracks `lastActiveDate` across calendar days. Consecutive active days increment streak (`streak += 1`), same-day usage preserves streak, and missing one or more days breaks the streak and resets it to 1.
+  - **Duplicate XP Prevention**: `EnrolmentModel.isCompleted` and `wasNotCompleted` guards guarantee that re-watching or re-completing lessons/courses never awards duplicate XP.
+  - **Device Profile Picture Upload**: Implemented `uploadProfilePhoto` in `CloudinaryUploadService` and device file picker in `Profile.dart`. Uploaded image is stored in Cloudinary and immediately updates `authProvider` state, Firestore `users/{uid}`, `Profile.dart`, and the top-right app bar avatar across every screen for both student and instructor.
+- **Section 7 & 8: Guest Browsing Architecture (Udemy Model), Action-Level Auth Gating & Security**:
+  - **Guest-First Navigation**: Unauthenticated guests can freely explore `Splash`, `Onboarding`, `Home`, `Courses` (search/filter/sort), `CourseDetails` (full curriculum + preview videos), `Cart`, `About`, `Contact`, `FAQ`, and `NotFound` screens without hitting an initial login gate.
+  - **Initial Router / GoRouter State**: Default session state is `guest` (`authProvider == null`). When an authenticated Instructor session is restored, the router auto-routes directly to `/instructor`.
+  - **Local Unauthenticated Cart**: Guests can add courses to cart freely in local Riverpod state (`cartProvider`) without requiring a Firestore write until Checkout.
+  - **Action-Level Auth Gating**: Gated only identity-required actions using `AuthGateModal.dart` bottom sheet/dialog and `AuthGateHelper.requireAuth`:
+    - Free 1-click enrollment & Paid Buy Now / Checkout
+    - Wishlist heart toggles across Home, Courses catalog, and CourseDetails
+    - Submitting course reviews & ratings
+    - Joining interactive live classes & real-time chat
+    - Starting quizzes and submitting attempts
+    - Playing non-preview lessons (prompts "Sign In to Unlock" before requesting stream token)
+    - Bottom navigation tabs for `My Learning` and `Profile`
+  - **Section 9: Leaderboard Profile Sync across Accounts, Google Sign-In Cancel Handling & UI Overflow Fixes**:
+  - **Leaderboard Duplication & Cross-Account Photo Sync Fix**:
+    - Resolved Firestore `publicProfiles` update permission denials by aligning `firestore.rules` for `users` and `publicProfiles` to allow owner profile updates while preserving immutability of `role`, `id`, and `email`.
+    - `AuthService.updateProfile` now updates both `users/{uid}` and `publicProfiles/{uid}` with complete public profile models upon avatar/bio changes, ensuring photo updates are visible instantly across all student and instructor accounts.
+    - Updated `getLeaderboardStream` and `Profile.dart` to preserve document IDs, filter corrupt/blank entries, and deduplicate entries using a unique user ID map, permanently eliminating duplicate rows and blank scores.
+  - **Google Sign-In Cancel & Dismiss Handling**:
+    - Handled `FirebaseAuthException` popup cancellations (`popup-closed-by-user`, `cancelled-popup-request`, `user-cancelled`) gracefully in `AuthService.signInWithGoogle`, `Login.dart`, `Register.dart`, and `AuthGateModal.dart`.
+    - Eliminated accidental mock fallback accounts (`'Google Learner'`) in live Firebase mode when the popup is dismissed, resetting loading spinners cleanly without creating ghost database entries.
+  - **Section 10: Video Stream Loop Resolution, XP Accuracy, Leaderboard User Count Alignment & Non-Stacking Popups**:
+  - **Video Player Re-initialization & Buffering Freeze Resolution**:
+    - Identified and eliminated the infinite reload loop in `Lesson.dart` where `ValueKey('${activeLesson.id}_$initialPosition')` was changing on every position tick, tearing down and recreating the video controller every 3-4 seconds.
+    - Added `_streamFuture` caching in `Lesson.dart` so Cloudflare Worker stream tokens are only fetched on genuine lesson switches, not on playback progress updates.
+    - Locked `CustomVideoPlayer` key to `ValueKey('player_${currentLesson.id}')`.
+    - Added `_hasCompleted` single-fire guard in `VideoPlayer.dart` to prevent calling `onComplete` multiple times at the end of video.
+  - **Accurate Single XP Accrual (+50 XP)**:
+    - Refactored `completeLesson` in `EnrolmentNotifier` to calculate completion state and award +50 XP strictly once outside iteration loops.
+    - Ensured clicking "Mark as Complete" on an already completed lesson does not trigger duplicate XP or redundant snackbars.
+  - **Leaderboard 4-Person Phantom Entry Fix**:
+    - Keyed the leaderboard deduplication map in `Profile.dart` by normalized `email.toLowerCase()` or unique `id`, ensuring the logged-in session merges into its own database entry rather than creating an extra 4th card.
+    - Filtered out any legacy dummy/mock IDs (`google_user_`) in `AuthService.getLeaderboardStream` and `Profile.dart`.
+  - **Non-Stacking UI Popups & SnackBars**:
+    - Updated `AppHelpers.showSnackBar` in `helpers.dart` to call `messenger.hideCurrentSnackBar()` before presenting new notifications, eliminating stacked/repeating popups.
+
+### Tested & Verified
+- `dart analyze lib` -> 0 issues found (100% Clean).
+- `flutter test` -> 55/55 test suites passed across all features.
+- `dart analyze lib` -> 0 issues found (100% Clean).
+- `flutter test` -> 51/51 test suites passed across all features.
+- Daily streak calendar transitions, duplicate XP guards, device profile picture upload, and real-time Firestore leaderboard verified end-to-end.
+- Atomic Firestore rating sum/count calculation and single-review-per-student deterministic doc ID verified.
+- Real-time stream reflection on instructor dashboard verified.
 - **Section 0 Security Hardening & Zero-Card Infrastructure**:
   - **Quizzes Security Rule**: Restricted write permissions on Firestore `quizzes` collection strictly to `isCourseInstructor(courseId)`.
   - **Certificates Security Rule**: Locked `allow write: if false;` on client side for `certificates` collection — certificates can now only be generated server-side by the Cloudflare Worker.

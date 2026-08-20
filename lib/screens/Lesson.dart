@@ -15,6 +15,7 @@ import '../components/LessonList.dart';
 import '../components/Button.dart';
 import '../components/Loader.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 final lessonStreamServiceProvider = Provider<LessonStreamService>((ref) {
   return LessonStreamService();
@@ -58,6 +59,35 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _currentLessonId = widget.lessonId;
+  }
+
+  Future<LessonStreamResult>? _streamFuture;
+  String? _cachedLessonId;
+  String? _cachedUserId;
+  bool? _cachedIsEnrolled;
+
+  Future<LessonStreamResult> _getStreamFuture(
+    LessonStreamService streamService, {
+    required String courseId,
+    required LessonModel lesson,
+    required String userId,
+    required bool isEnrolled,
+  }) {
+    if (_streamFuture == null ||
+        _cachedLessonId != lesson.id ||
+        _cachedUserId != userId ||
+        _cachedIsEnrolled != isEnrolled) {
+      _cachedLessonId = lesson.id;
+      _cachedUserId = userId;
+      _cachedIsEnrolled = isEnrolled;
+      _streamFuture = streamService.getVideoStreamUrl(
+        courseId: courseId,
+        lesson: lesson,
+        userId: userId,
+        isEnrolled: isEnrolled,
+      );
+    }
+    return _streamFuture!;
   }
 
   @override
@@ -124,11 +154,12 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
         for (final l in allLessons) {
           if (l.id == _currentLessonId) activeLesson = l;
         }
-        activeLesson ??= allLessons.isNotEmpty
-            ? allLessons.first
-            : const LessonModel(id: '1', courseId: '1', title: 'Course Overview', videoUrl: '', order: 1);
+        final LessonModel currentLesson = activeLesson ??
+            (allLessons.isNotEmpty
+                ? allLessons.first
+                : const LessonModel(id: '1', courseId: '1', title: 'Course Overview', videoUrl: '', order: 1));
 
-        final currentIndex = allLessons.indexWhere((l) => l.id == activeLesson!.id);
+        final currentIndex = allLessons.indexWhere((l) => l.id == currentLesson.id);
         final hasPrevious = currentIndex > 0;
         final hasNext = currentIndex >= 0 && currentIndex < allLessons.length - 1;
 
@@ -149,12 +180,12 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
         );
 
         // Load existing note into controller if empty
-        final savedNote = currentEnrolment.lessonNotes[activeLesson.id] ?? '';
+        final savedNote = currentEnrolment.lessonNotes[currentLesson.id] ?? '';
         if (_noteController.text.isEmpty && savedNote.isNotEmpty) {
           _noteController.text = savedNote;
         }
 
-        final initialPosition = currentEnrolment.lastPlayedPositions[activeLesson.id] ?? 0;
+        final initialPosition = currentEnrolment.lastPlayedPositions[currentLesson.id] ?? 0;
 
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -202,10 +233,10 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                           children: [
                             // Video Player / Server-Side Access Control Lock
                             FutureBuilder<LessonStreamResult>(
-                              key: ValueKey('${course.id}_${activeLesson.id}'),
-                              future: streamService.getVideoStreamUrl(
+                              future: _getStreamFuture(
+                                streamService,
                                 courseId: course.id,
-                                lesson: activeLesson,
+                                lesson: currentLesson,
                                 userId: authUser?.id ?? 'guest',
                                 isEnrolled: isEnrolled,
                               ),
@@ -265,13 +296,33 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                               ),
                                               const SizedBox(height: 16),
                                               AppButton(
-                                                label: isAccessDenied ? 'Enroll to Unlock' : 'Retry Stream',
+                                                label: isAccessDenied
+                                                    ? (authUser == null ? 'Sign In to Unlock' : 'Enroll to Unlock')
+                                                    : 'Retry Stream',
                                                 variant: ButtonVariant.secondary,
                                                 size: ButtonSize.sm,
-                                                icon: isAccessDenied ? Icons.shopping_cart_outlined : Icons.refresh,
+                                                icon: isAccessDenied
+                                                    ? (authUser == null ? Icons.login : Icons.shopping_cart_outlined)
+                                                    : Icons.refresh,
                                                 onPressed: isAccessDenied
-                                                    ? () => context.go('/course/${course.id}')
-                                                    : () => setState(() {}),
+                                                    ? (authUser == null
+                                                        ? () {
+                                                            AuthGateHelper.requireAuth(
+                                                              context,
+                                                              ref,
+                                                              actionTitle: 'Watch Full Lesson',
+                                                              reason: 'Sign in to access your enrolled courses and resume video lessons.',
+                                                              onAuthenticated: () {
+                                                                setState(() {
+                                                                  _streamFuture = null;
+                                                                });
+                                                              },
+                                                            );
+                                                          }
+                                                        : () => context.go('/course/${course.id}'))
+                                                    : () => setState(() {
+                                                          _streamFuture = null;
+                                                        }),
                                               ),
                                             ],
                                           ),
@@ -282,27 +333,29 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                 }
 
                                 final streamResult = snapshot.data!;
-                                final parsedDuration = _parseDurationSeconds(activeLesson?.duration ?? '10:00');
+                                final parsedDuration = _parseDurationSeconds(currentLesson.duration);
                                 return CustomVideoPlayer(
-                                  key: ValueKey('${activeLesson!.id}_$initialPosition'),
+                                  key: ValueKey('player_${currentLesson.id}'),
                                   videoUrl: streamResult.streamUrl,
-                                  title: activeLesson.title,
+                                  title: currentLesson.title,
                                   initialPositionSeconds: initialPosition,
                                   totalDurationSeconds: parsedDuration,
                                   onPositionChanged: (seconds) {
                                     ref.read(enrolmentProvider.notifier).savePlaybackPosition(
                                           course.id,
-                                          activeLesson!.id,
+                                          currentLesson.id,
                                           seconds,
                                         );
                                   },
                                   onComplete: () {
-                                    ref.read(enrolmentProvider.notifier).completeLesson(
+                                    final isNew = ref.read(enrolmentProvider.notifier).completeLesson(
                                           course.id,
-                                          activeLesson!.id,
+                                          currentLesson.id,
                                           course.totalLessons,
                                         );
-                                    AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
+                                    if (isNew && mounted) {
+                                      AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
+                                    }
                                   },
                                 );
                               },
@@ -325,7 +378,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                           borderRadius: AppSpacing.roundedFull,
                                         ),
                                         child: Text(
-                                          'Lesson ${activeLesson.order} · ${course.category}',
+                                          'Lesson ${currentLesson.order} · ${course.category}',
                                           style: AppTypography.labelSmall.copyWith(
                                             color: AppColors.secondary,
                                             fontWeight: FontWeight.w700,
@@ -334,7 +387,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        activeLesson.title,
+                                        currentLesson.title,
                                         style: AppTypography.headlineSmall.copyWith(fontWeight: FontWeight.w800),
                                       ),
                                       const SizedBox(height: 2),
@@ -347,21 +400,28 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                 ),
                                 const SizedBox(width: 10),
                                 AppButton(
-                                  label: currentEnrolment.completedLessons.contains(activeLesson.id)
+                                  label: currentEnrolment.completedLessons.contains(currentLesson.id)
                                       ? 'Completed'
                                       : 'Mark as Complete',
-                                  variant: currentEnrolment.completedLessons.contains(activeLesson.id)
+                                  variant: currentEnrolment.completedLessons.contains(currentLesson.id)
                                       ? ButtonVariant.secondary
                                       : ButtonVariant.outline,
                                   size: ButtonSize.sm,
                                   icon: Icons.check_circle,
                                   onPressed: () {
-                                    ref.read(enrolmentProvider.notifier).completeLesson(
+                                    final isAlreadyCompleted = currentEnrolment.completedLessons.contains(currentLesson.id);
+                                    if (isAlreadyCompleted) {
+                                      AppHelpers.showSnackBar(context, 'This lesson is already completed.');
+                                      return;
+                                    }
+                                    final isNew = ref.read(enrolmentProvider.notifier).completeLesson(
                                           course.id,
-                                          activeLesson!.id,
+                                          currentLesson.id,
                                           course.totalLessons,
                                         );
-                                    AppHelpers.showSnackBar(context, 'Lesson progress saved! +50 XP');
+                                    if (isNew && mounted) {
+                                      AppHelpers.showSnackBar(context, 'Lesson complete! +50 XP awarded 🎯');
+                                    }
                                   },
                                 ),
                               ],
@@ -389,6 +449,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                       onLessonSelected: (lesson) {
                                         setState(() {
                                           _currentLessonId = lesson.id;
+                                          _streamFuture = null;
                                           _noteController.text = currentEnrolment.lessonNotes[lesson.id] ?? '';
                                         });
                                       },
@@ -455,7 +516,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                             onPressed: () {
                                               ref.read(enrolmentProvider.notifier).saveLessonNote(
                                                     course.id,
-                                                    activeLesson!.id,
+                                                    currentLesson.id,
                                                     _noteController.text,
                                                   );
                                               AppHelpers.showSnackBar(context, 'Notes saved to your cloud profile!');
@@ -484,7 +545,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                           onChanged: (val) {
                                             ref.read(enrolmentProvider.notifier).saveLessonNote(
                                                   course.id,
-                                                  activeLesson!.id,
+                                                  currentLesson.id,
                                                   val,
                                                 );
                                           },
@@ -496,8 +557,8 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                   // Tab 3: Resources (Authenticated Cloudinary Raw Files)
                                   ListView(
                                     children: [
-                                      if (activeLesson.resources.isNotEmpty)
-                                        ...activeLesson.resources.map((res) {
+                                      if (currentLesson.resources.isNotEmpty)
+                                        ...currentLesson.resources.map((res) {
                                           final isPdf = res.type.toLowerCase() == 'pdf';
                                           return ListTile(
                                             leading: Icon(
@@ -506,7 +567,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                             ),
                                             title: Text(res.title),
                                             subtitle: Text(
-                                              activeLesson!.isPreview || res.isPreview
+                                              currentLesson.isPreview || res.isPreview
                                                   ? 'Free Preview Asset · Cloudinary Raw'
                                                   : 'Authenticated Enrolled Asset · Signed Cloudinary Raw',
                                             ),
@@ -515,7 +576,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                               try {
                                                 await streamService.getResourceDeliveryUrl(
                                                   courseId: course.id,
-                                                  lesson: activeLesson!,
+                                                  lesson: currentLesson,
                                                   resource: res,
                                                   userId: authUser?.id ?? 'guest',
                                                   isEnrolled: isEnrolled,
@@ -543,7 +604,7 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                           leading: const Icon(Icons.picture_as_pdf, color: AppColors.error),
                                           title: const Text('Architecture Blueprint & Source Notes (PDF)'),
                                           subtitle: Text(
-                                            activeLesson.isPreview
+                                            currentLesson.isPreview
                                                 ? 'Free Preview Asset · Cloudinary Raw'
                                                 : 'Authenticated Enrolled Asset · Signed Cloudinary Raw',
                                           ),
@@ -554,11 +615,11 @@ class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerPr
                                                 title: 'Architecture Blueprint (PDF)',
                                                 cloudinaryPublicId: 'edusphere/resources/${course.id}/arch_blueprint',
                                                 type: 'pdf',
-                                                isPreview: activeLesson!.isPreview,
+                                                isPreview: currentLesson.isPreview,
                                               );
                                               await streamService.getResourceDeliveryUrl(
                                                 courseId: course.id,
-                                                lesson: activeLesson,
+                                                lesson: currentLesson,
                                                 resource: fallbackRes,
                                                 userId: authUser?.id ?? 'guest',
                                                 isEnrolled: isEnrolled,

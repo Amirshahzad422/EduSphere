@@ -254,9 +254,11 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                     ],
                     child: CircleAvatar(
                       radius: 18,
-                      backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+                      backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+                          ? NetworkImage(user.photoUrl!)
+                          : null,
                       backgroundColor: isInstructor ? AppColors.secondary : AppColors.primaryContainer,
-                      child: user.photoUrl == null
+                      child: (user.photoUrl == null || user.photoUrl!.isEmpty)
                           ? Text(
                               user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -264,11 +266,31 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                           : null,
                     ),
                   )
-                else
+                else ...[
+                  // Guest Login / Sign Up Actions (Udemy style)
                   TextButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Sign In'),
+                    onPressed: () => context.push('/login'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    child: const Text('Log In'),
                   ),
+                  if (isDesktop) ...[
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => context.push('/register'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedMd),
+                      ),
+                      child: const Text('Sign Up Free', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ],
               ],
             ],
           ),

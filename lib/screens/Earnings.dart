@@ -119,12 +119,14 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     return matchId || matchName;
                   }).toList();
 
-                  // REAL DATA CALCULATIONS
-                  final grossSales = myCourses.fold<double>(0, (sum, c) => sum + (c.enrolmentCount * c.price));
-                  final lifetimeEarnings = grossSales * 0.85; // 85% instructor payout rate
+                  // REAL DATA CALCULATIONS - STRICTLY BASED ON ENROLLED STUDENTS & EFFECTIVE DISCOUNTED PRICE
+                  final totalStudents = myCourses.fold<int>(0, (sum, c) => sum + c.enrolmentCount);
+                  final grossSales = myCourses.fold<double>(0, (sum, c) => sum + c.grossSales);
+                  final lifetimeEarnings = myCourses.fold<double>(0, (sum, c) => sum + c.instructorRevenue); // 85% instructor payout rate
+                  final platformFee = grossSales * 0.15; // 15% platform infrastructure fee
                   final availableBalance = (lifetimeEarnings - _withdrawnAmount).clamp(0.0, double.infinity);
-                  final avgPrice = myCourses.isNotEmpty
-                      ? (myCourses.fold<double>(0, (sum, c) => sum + c.price) / myCourses.length)
+                  final avgEffectivePrice = myCourses.isNotEmpty
+                      ? (myCourses.fold<double>(0, (sum, c) => sum + c.effectivePrice) / myCourses.length)
                       : 0.0;
 
                   // Real course sales transactions
@@ -133,8 +135,9 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     if (c.enrolmentCount > 0) {
                       salesTransactions.add({
                         'id': 'TX-${c.id.hashCode.abs().toString().substring(0, 4)}',
-                        'course': '${c.title} (${c.enrolmentCount} sales)',
-                        'amount': '+${AppFormatters.formatCurrency(c.enrolmentCount * c.price * 0.85)}',
+                        'course': c.title,
+                        'details': '${c.enrolmentCount} students • ${AppFormatters.formatCurrency(c.effectivePrice)}${c.discount > 0 ? ' (${c.discount.round()}% OFF)' : ''}',
+                        'amount': '+${AppFormatters.formatCurrency(c.instructorRevenue)}',
                         'date': 'Active Sales',
                         'isPayout': false,
                       });
@@ -147,18 +150,23 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                     _BalanceCard(
                       title: 'Available for Payout',
                       amount: AppFormatters.formatCurrency(availableBalance),
-                      subtext: availableBalance > 0 ? 'Ready for automatic payout' : 'No payout balance available',
+                      subtext: availableBalance > 0 ? 'Ready for instant payout' : 'No payout balance available',
                       isHighlight: true,
                     ),
                     _BalanceCard(
-                      title: 'Lifetime Earnings',
+                      title: 'Net Lifetime Earnings (85%)',
                       amount: AppFormatters.formatCurrency(lifetimeEarnings),
-                      subtext: 'Across ${myCourses.length} published course${myCourses.length == 1 ? '' : 's'}',
+                      subtext: 'From $totalStudents student enrollments',
+                    ),
+                    _BalanceCard(
+                      title: 'Gross Course Sales',
+                      amount: AppFormatters.formatCurrency(grossSales),
+                      subtext: 'Platform Fee (15%): ${AppFormatters.formatCurrency(platformFee)}',
                     ),
                     _BalanceCard(
                       title: 'Avg. Course Price',
-                      amount: AppFormatters.formatCurrency(avgPrice),
-                      subtext: myCourses.isNotEmpty ? 'Based on active pricing' : 'No courses published',
+                      amount: AppFormatters.formatCurrency(avgEffectivePrice),
+                      subtext: myCourses.isNotEmpty ? 'Effective across ${myCourses.length} courses' : 'No courses published',
                     ),
                   ];
 
@@ -323,7 +331,9 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(
-                                  '${tx['id']} • ${tx['date']}',
+                                  tx['details'] != null
+                                      ? '${tx['details']} • ${tx['id']}'
+                                      : '${tx['id']} • ${tx['date']}',
                                   style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
                                 ),
                                 trailing: Text(
@@ -386,14 +396,20 @@ class _BalanceCard extends StatelessWidget {
               color: isHighlight ? AppColors.primary : AppColors.outline,
               fontWeight: FontWeight.w700,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 10),
-          Text(
-            amount,
-            style: AppTypography.displayMedium.copyWith(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: isHighlight ? AppColors.primary : AppColors.onSurface,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              amount,
+              style: AppTypography.displayMedium.copyWith(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: isHighlight ? AppColors.primary : AppColors.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -403,6 +419,8 @@ class _BalanceCard extends StatelessWidget {
               color: AppColors.secondary,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

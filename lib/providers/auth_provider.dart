@@ -9,7 +9,19 @@ final authServiceProvider = Provider<AuthService>((ref) {
 class AuthNotifier extends StateNotifier<UserModel?> {
   final AuthService _authService;
 
-  AuthNotifier(this._authService) : super(_authService.currentUser);
+  AuthNotifier(this._authService) : super(_authService.currentUser) {
+    _initStreakCheck();
+  }
+
+  void _initStreakCheck() {
+    if (state != null) {
+      _authService.checkAndUpdateDailyStreak().then((updated) {
+        if (updated != null) {
+          state = updated;
+        }
+      }).catchError((_) {});
+    }
+  }
 
   bool get isAuthenticated => state != null;
   bool get isStudent => state?.role == UserRole.student;
@@ -67,6 +79,13 @@ class AuthNotifier extends StateNotifier<UserModel?> {
     }
   }
 
+  Future<void> checkDailyStreak() async {
+    final updated = await _authService.checkAndUpdateDailyStreak();
+    if (updated != null) {
+      state = updated;
+    }
+  }
+
   Future<void> signOut() async {
     await _authService.signOut();
     state = null;
@@ -78,11 +97,23 @@ class AuthNotifier extends StateNotifier<UserModel?> {
       state = state!.copyWith(role: newRole);
     }
   }
+
+  Future<void> upgradeToInstructor() async {
+    final updated = await _authService.upgradeToInstructor();
+    if (updated != null) {
+      state = updated;
+    }
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, UserModel?>((ref) {
   final service = ref.watch(authServiceProvider);
   return AuthNotifier(service);
+});
+
+final leaderboardStreamProvider = StreamProvider<List<UserModel>>((ref) {
+  final service = ref.watch(authServiceProvider);
+  return service.getLeaderboardStream();
 });
 
 final isAuthenticatedProvider = Provider<bool>((ref) {

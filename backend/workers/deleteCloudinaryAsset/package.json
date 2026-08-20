@@ -1,0 +1,9 @@
+{
+  "name": "delete-cloudinary-asset-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker to safely delete Cloudinary assets with instructor verification",
+  "main": "index.js",
+  "dependencies": {
+    "firebase-auth-cloudflare-workers": "^1.2.0"
+  }
+}

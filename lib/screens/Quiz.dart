@@ -9,8 +9,10 @@ import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
 import '../components/QuizWidget.dart';
+import '../components/Button.dart';
 import '../components/Loader.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 class QuizScreen extends ConsumerWidget {
   final String quizId;
@@ -107,26 +109,77 @@ class QuizScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // Interactive Quiz Card & Explanation Review
-                  QuizWidget(
-                    quiz: targetQuiz,
-                    userId: authUser?.id ?? 'guest_student',
-                    onQuizCompleted: (attempt) async {
-                      // Persist to Cloud Firestore quizAttempts collection
-                      final quizService = QuizService();
-                      await quizService.recordAttempt(attempt);
+                  // Interactive Quiz Card or Guest Sign In Card
+                  if (authUser == null)
+                    Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppSpacing.roundedLg,
+                        border: Border.all(color: AppColors.surfaceContainerHigh),
+                        boxShadow: const [
+                          BoxShadow(color: AppColors.cardShadow, blurRadius: 12, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.quiz_outlined, size: 48, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Sign In to Take Assessment',
+                            style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Log in or create a free account to take this module quiz, submit your answers, and earn XP towards your verified certificate.',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 24),
+                          AppButton(
+                            label: 'Sign In to Start Quiz',
+                            variant: ButtonVariant.primary,
+                            icon: Icons.login,
+                            onPressed: () {
+                              AuthGateHelper.requireAuth(
+                                context,
+                                ref,
+                                actionTitle: 'Start Quiz Assessment',
+                                reason: 'Sign in to record your quiz score and track module completion.',
+                                onAuthenticated: () {},
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    QuizWidget(
+                      quiz: targetQuiz,
+                      userId: authUser.id,
+                      onQuizCompleted: (attempt) async {
+                        // Persist to Cloud Firestore quizAttempts collection
+                        final quizService = QuizService();
+                        await quizService.recordAttempt(attempt);
 
-                      if (context.mounted) {
-                        AppHelpers.showSnackBar(
-                          context,
-                          attempt.passed
-                              ? '🏆 Assessment Passed! Score: ${attempt.score}% (Saved to profile)'
-                              : 'Assessment recorded. Score: ${attempt.score}%. You can review explanations and retry.',
-                          isError: !attempt.passed,
-                        );
-                      }
-                    },
-                  ),
+                        if (context.mounted) {
+                          AppHelpers.showSnackBar(
+                            context,
+                            attempt.passed
+                                ? '🏆 Assessment Passed! Score: ${attempt.score}% (Saved to profile)'
+                                : 'Assessment recorded. Score: ${attempt.score}%. You can review explanations and retry.',
+                            isError: !attempt.passed,
+                          );
+                        }
+                      },
+                    ),
                 ],
               ),
             ),

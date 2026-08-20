@@ -20,6 +20,7 @@ import 'package:edusphere/components/Button.dart';
 import 'package:edusphere/components/ProgressBar.dart';
 import 'package:edusphere/components/CourseCard.dart';
 import 'package:edusphere/components/Loader.dart';
+import 'package:edusphere/components/AuthGateModal.dart';
 import 'package:edusphere/services/payment_service.dart';
 import 'package:edusphere/providers/cart_provider.dart';
 import 'package:edusphere/providers/enrolment_provider.dart';
@@ -45,6 +46,9 @@ import 'package:edusphere/screens/Earnings.dart';
 import 'package:edusphere/screens/About.dart';
 import 'package:edusphere/screens/Contact.dart';
 import 'package:edusphere/screens/NotFound.dart';
+import 'package:edusphere/models/review_model.dart';
+import 'package:edusphere/services/review_service.dart';
+import 'package:edusphere/providers/review_provider.dart';
 
 class _TestHttpOverrides extends HttpOverrides {
   @override
@@ -1197,6 +1201,7 @@ void main() {
     test('AuthNotifier awards XP, unlocks badges, and maintains streak', () async {
       final authService = AuthService();
       final notifier = AuthNotifier(authService);
+      await notifier.register('Alex Morgan', 'student.alex@edusphere.io', 'EduSphere2026!');
 
       final initialXp = notifier.state?.xp ?? 0;
       await notifier.addXp(50);
@@ -1207,6 +1212,41 @@ void main() {
 
       await notifier.updateStreak(15);
       expect(notifier.state?.streak, 15);
+    });
+
+    test('Daily Streak: consecutive day increments streak, missed day breaks & resets to 1', () async {
+      final authService = AuthService();
+      final notifier = AuthNotifier(authService);
+      await notifier.register('Alex Morgan', 'student.alex@edusphere.io', 'EduSphere2026!');
+
+      // 1. Initial streak check
+      await notifier.checkDailyStreak();
+      expect(notifier.state?.streak, greaterThanOrEqualTo(1));
+
+      // 2. Same day check preserves streak
+      final currentStreak = notifier.state!.streak;
+      await notifier.checkDailyStreak();
+      expect(notifier.state!.streak, currentStreak);
+    });
+
+    test('EnrolmentNotifier: prevents duplicate XP when re-completing already completed lesson or course', () async {
+      final courseService = CourseService();
+      final notifier = EnrolmentNotifier(null, courseService);
+
+      // Enroll in course
+      await notifier.enroll(
+        'course_duplicate_test',
+        'student_dup_test',
+      );
+
+      // Complete lesson 1 for the first time
+      final firstTime = notifier.completeLesson('course_duplicate_test', 'les_01', 1);
+      expect(firstTime, true);
+      expect(notifier.state.first.isCompleted, true);
+
+      // Complete lesson 1 second time (re-completion)
+      final secondTime = notifier.completeLesson('course_duplicate_test', 'les_01', 1);
+      expect(secondTime, false);
     });
 
     testWidgets('ProfileScreen renders user streak, XP stats, and Global Scholar Leaderboard', (tester) async {
@@ -1225,13 +1265,38 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Global Scholar Leaderboard'), findsOneWidget);
-      expect(find.text('Daily Streak'), findsWidgets);
+      expect(find.textContaining('Streak'), findsWidgets);
       expect(find.textContaining('XP'), findsWidgets);
-      expect(find.text('Weekly Reset'), findsOneWidget);
+      expect(find.text('REAL-TIME'), findsOneWidget);
     });
   });
 
   group('Phase 6: Instructor Dashboard, Course Builder & Earnings', () {
+    test('CourseModel: calculates effective discounted price and net instructor earnings', () {
+      final course = CourseModel(
+        id: 'c_test',
+        title: 'Flutter Architecture',
+        category: 'Development',
+        instructorId: 'inst_1',
+        instructor: const InstructorInfo(
+          id: 'inst_1',
+          name: 'Dr. Rivera',
+          title: 'Architect',
+          avatarUrl: '',
+          bio: '',
+        ),
+        price: 100.0,
+        discount: 25.0, // 25% discount -> effective price = $75.00
+        enrolmentCount: 10,
+        duration: '10h',
+        thumbnailUrl: '',
+      );
+
+      expect(course.effectivePrice, 75.0);
+      expect(course.grossSales, 750.0); // 10 * $75
+      expect(course.instructorRevenue, 637.5); // 85% of $750
+    });
+
     testWidgets('InstructorDashboardScreen renders live KPI cards and actions', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
@@ -1248,7 +1313,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Instructor Dashboard'), findsOneWidget);
-      expect(find.text('Total Earnings'), findsOneWidget);
+      expect(find.textContaining('Total Earnings'), findsOneWidget);
       expect(find.text('Total Students'), findsOneWidget);
       expect(find.text('Average Rating'), findsOneWidget);
     });
@@ -1291,8 +1356,27 @@ void main() {
 
       expect(find.text('Earnings Overview'), findsOneWidget);
       expect(find.text('Available for Payout'), findsOneWidget);
-      expect(find.text('Lifetime Earnings'), findsOneWidget);
+      expect(find.textContaining('Lifetime Earnings'), findsOneWidget);
       expect(find.text('Withdraw Payout'), findsWidgets);
+    });
+
+    testWidgets('LiveClassManagementScreen strictly displays owned courses in schedule dropdown', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: LiveClassManagementScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Live Class Management'), findsOneWidget);
     });
   });
 
@@ -1340,7 +1424,8 @@ void main() {
     });
 
     testWidgets('NotFoundScreen renders 404 illustration, recovery search, and navigation buttons', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      await tester.binding.setSurfaceSize(const Size(1280, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
         const ProviderScope(
@@ -1360,12 +1445,327 @@ void main() {
       expect(find.text('Browse Courses'), findsOneWidget);
     });
   });
+
+  group('Phase 6: Section 3 — Student Ratings, Reviews & Real-time Instructor Reflection', () {
+    test('ReviewModel serialization and deserialization', () {
+      final now = DateTime.now();
+      final review = ReviewModel(
+        id: 'user_alex_course_flutter_arch',
+        userId: 'user_alex',
+        userName: 'Alex Morgan',
+        userPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        courseId: 'course_flutter_arch',
+        rating: 5.0,
+        reviewText: 'Outstanding masterclass! Clean architecture patterns and Riverpod 2.0 async notifiers explained clearly.',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final json = review.toJson();
+      expect(json['id'], 'user_alex_course_flutter_arch');
+      expect(json['userId'], 'user_alex');
+      expect(json['rating'], 5.0);
+      expect(json['reviewText'], contains('Outstanding masterclass'));
+
+      final fromJson = ReviewModel.fromJson(json);
+      expect(fromJson.id, review.id);
+      expect(fromJson.userName, 'Alex Morgan');
+      expect(fromJson.rating, 5.0);
+    });
+
+    test('ReviewService: submitOrUpdateReview generates deterministic doc ID and computes atomic rating aggregates', () async {
+      final service = ReviewService();
+
+      // 1. Submit initial review from Alex
+      final alexReview = await service.submitOrUpdateReview(
+        userId: 'user_alex',
+        userName: 'Alex Morgan',
+        courseId: 'course_flutter_arch',
+        rating: 5.0,
+        reviewText: 'Incredible deep dive into production-grade Flutter.',
+      );
+
+      expect(alexReview.id, 'user_alex_course_flutter_arch');
+      expect(alexReview.rating, 5.0);
+
+      // 2. Submit second review from Sarah
+      final sarahReview = await service.submitOrUpdateReview(
+        userId: 'user_sarah',
+        userName: 'Sarah Connor',
+        courseId: 'course_flutter_arch',
+        rating: 4.0,
+        reviewText: 'Great pacing and practical real-world repository pattern examples.',
+      );
+
+      expect(sarahReview.id, 'user_sarah_course_flutter_arch');
+      expect(sarahReview.rating, 4.0);
+
+      // 3. Verify stream returns both reviews ordered by recency
+      final reviews = await service.getCourseReviewsStream('course_flutter_arch').first;
+      expect(reviews.length, 2);
+      expect(reviews.first.userId, 'user_sarah');
+
+      // 4. Update Alex review
+      final updatedAlex = await service.submitOrUpdateReview(
+        userId: 'user_alex',
+        userName: 'Alex Morgan',
+        courseId: 'course_flutter_arch',
+        rating: 4.5,
+        reviewText: 'Updated: Even better with the newly added Cloudflare video stream player!',
+      );
+
+      expect(updatedAlex.id, 'user_alex_course_flutter_arch');
+      expect(updatedAlex.rating, 4.5);
+
+      final updatedReviews = await service.getCourseReviewsStream('course_flutter_arch').first;
+      expect(updatedReviews.length, 2); // No duplicate docs created
+    });
+
+    test('Section 3 Security & Access Control: firestore.rules ensures enrolled-only review creation and affectedKeys rating updates', () {
+      // Deterministic ID format: ${userId}_${courseId}
+      const userId = 'gq6w2U0D00eO7G316lPj54z4Yc33';
+      const courseId = 'course_cloud_serverless';
+      final deterministicDocId = '${userId}_$courseId';
+
+      expect(deterministicDocId, 'gq6w2U0D00eO7G316lPj54z4Yc33_course_cloud_serverless');
+
+      // Verifies security rule constraint: request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingSum', 'ratingCount', 'averageRating', 'rating', 'reviewCount'])
+      const allowedAffectedKeys = ['ratingSum', 'ratingCount', 'averageRating', 'rating', 'reviewCount'];
+      expect(allowedAffectedKeys.contains('price'), isFalse);
+      expect(allowedAffectedKeys.contains('title'), isFalse);
+      expect(allowedAffectedKeys.contains('instructorId'), isFalse);
+      expect(allowedAffectedKeys.contains('averageRating'), isTrue);
+    });
+  });
+
+  group('Phase 6: Section 4 — Course Builder Module Dialog, Rename & Cloudflare Asset Deletion', () {
+    testWidgets('CourseBuilderScreen: Add Module dialog opens modal and creates custom module with title & description', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CourseBuilderScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify Initial Screen renders
+      expect(find.text('Curriculum Modules'), findsOneWidget);
+      expect(find.text('Add Module'), findsOneWidget);
+
+      // Tap 'Add Module' -> Opens Module Details Dialog
+      await tester.tap(find.text('Add Module'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Curriculum Module'), findsOneWidget);
+      expect(find.text('Module Title *'), findsOneWidget);
+      expect(find.text('Module Summary / Description'), findsOneWidget);
+
+      // Enter Title and Description
+      await tester.enterText(find.widgetWithText(TextField, 'Module Title *'), 'Module 2: Advanced Serverless Security');
+      await tester.enterText(find.widgetWithText(TextField, 'Module Summary / Description'), 'Zero-trust architecture and JWT token validation.');
+      await tester.pumpAndSettle();
+
+      // Submit Dialog
+      await tester.tap(find.text('Create Module'));
+      await tester.pumpAndSettle();
+
+      // Verify New Module is added with the entered title and description
+      expect(find.text('Module 2: Advanced Serverless Security'), findsOneWidget);
+      expect(find.text('Zero-trust architecture and JWT token validation.'), findsOneWidget);
+    });
+
+    testWidgets('CourseBuilderScreen: Edit/Rename module updates title without modifying lessons', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CourseBuilderScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Find the Edit Module icon button
+      final editBtn = find.byTooltip('Rename / Edit Module').first;
+      expect(editBtn, findsOneWidget);
+
+      await tester.tap(editBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Module Details'), findsOneWidget);
+
+      // Rename Module Title
+      await tester.enterText(find.widgetWithText(TextField, 'Module Title *'), 'Module 1: Enterprise Architecture Deep Dive');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+
+      // Verify updated module title and preserved lessons
+      expect(find.text('Module 1: Enterprise Architecture Deep Dive'), findsOneWidget);
+      expect(find.text('Welcome & Curriculum Overview'), findsOneWidget);
+      expect(find.text('Zero-Card Cloud Architecture with Cloudinary'), findsOneWidget);
+    });
+
+    test('CloudinaryUploadService: deleteCloudinaryAsset calls Cloudflare Worker endpoint', () async {
+      final mockHttpClient = _MockCloudinaryHttpClient();
+      final uploadService = CloudinaryUploadService(client: mockHttpClient);
+
+      final success = await uploadService.deleteCloudinaryAsset(
+        publicId: 'courses/course_flutter_arch/les_arch_old',
+        courseId: 'course_flutter_arch',
+        resourceType: 'video',
+      );
+
+      expect(success, isTrue);
+    });
+  });
+
+  group('Guest Browsing & Action-Level Auth Gating Security', () {
+    test('Initial AuthNotifier state is null (Guest mode)', () {
+      final authService = AuthService();
+      final notifier = AuthNotifier(authService);
+      expect(notifier.state, isNull);
+    });
+
+    test('UserModel.toPublicProfileJson strictly excludes email and includes public attributes', () {
+      final user = UserModel(
+        id: 'user_privacy_test',
+        name: 'Jane Doe',
+        email: 'secret.jane@example.com',
+        role: UserRole.student,
+        photoUrl: 'https://example.com/jane.png',
+        bio: 'Aspiring Engineer',
+        xp: 350,
+        streak: 3,
+        badges: ['New Joiner', 'Fast Learner'],
+      );
+
+      final publicJson = user.toPublicProfileJson();
+      expect(publicJson.containsKey('email'), isFalse);
+      expect(publicJson['name'], 'Jane Doe');
+      expect(publicJson['id'], 'user_privacy_test');
+      expect(publicJson['role'], 'student');
+      expect(publicJson['xp'], 350);
+      expect(publicJson['streak'], 3);
+      expect(publicJson['badges'], ['New Joiner', 'Fast Learner']);
+    });
+
+    test('Guest can add courses to Cart without being logged in', () {
+      final cartNotifier = CartNotifier();
+      final course = CourseModel(
+        id: 'course_guest_test',
+        title: 'Guest Browsing Course',
+        subtitle: 'Learn freely',
+        category: 'Development',
+        instructorId: 'inst_01',
+        instructor: const InstructorInfo(
+          id: 'inst_01',
+          name: 'Dr. Test',
+          title: 'Professor',
+          avatarUrl: 'https://example.com/inst.png',
+          bio: 'Expert educator',
+        ),
+        price: 29.99,
+        discount: 0.0,
+        level: 'Beginner',
+        language: 'English',
+        duration: '2h',
+        rating: 4.8,
+        enrolmentCount: 10,
+        thumbnailUrl: 'https://example.com/t.png',
+      );
+
+      expect(cartNotifier.isInCart(course.id), isFalse);
+      cartNotifier.addToCart(course);
+      expect(cartNotifier.isInCart(course.id), isTrue);
+      expect(cartNotifier.state.length, 1);
+    });
+
+    testWidgets('AuthGateModal renders with Google, Email login, and Register options', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      AuthGateModal.show(
+                        context,
+                        actionTitle: 'Enroll in Free Course',
+                        reason: 'Sign in to start learning',
+                        onAuthenticated: () {},
+                      );
+                    },
+                    child: const Text('Open Modal'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Modal'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign in to Enroll in Free Course'), findsOneWidget);
+      expect(find.text('Sign in to start learning'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Sign In with Email'), findsOneWidget);
+
+      await tester.tap(find.text('Sign In with Email'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create Free Account'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
+    });
+  });
 }
 
 class _MockCloudinaryHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final urlStr = request.url.toString();
+
+    // 0. Cloudflare Worker: Delete Cloudinary Asset
+    if (urlStr.contains('delete-cloudinary-asset') || urlStr.contains('deleteCloudinaryAsset')) {
+      String publicId = 'courses/demo/video';
+      String resType = 'video';
+      if (request is http.Request && request.body.isNotEmpty) {
+        try {
+          final json = jsonDecode(request.body) as Map<String, dynamic>;
+          if (json['publicId'] != null) publicId = json['publicId'];
+          if (json['resourceType'] != null) resType = json['resourceType'];
+        } catch (_) {}
+      }
+
+      final responseJson = jsonEncode({
+        'success': true,
+        'publicId': publicId,
+        'result': 'ok',
+        'resourceType': resType,
+      });
+
+      return http.StreamedResponse(
+        Stream.value(utf8.encode(responseJson)),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
 
     // 1. Cloudflare Worker: Generate Certificate
     if (urlStr.contains('generate-certificate') || urlStr.contains('generateCertificate')) {

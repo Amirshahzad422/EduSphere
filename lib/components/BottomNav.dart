@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../styles/colors.dart';
+import '../utils/auth_gate.dart';
 
 class CustomBottomNav extends ConsumerWidget {
   final String currentLocation;
@@ -30,7 +31,7 @@ class CustomBottomNav extends ConsumerWidget {
     return 0;
   }
 
-  void _onStudentTapped(int index, BuildContext context) {
+  void _onStudentTapped(int index, BuildContext context, WidgetRef ref) {
     switch (index) {
       case 0:
         context.go('/home');
@@ -39,13 +40,29 @@ class CustomBottomNav extends ConsumerWidget {
         context.go('/courses');
         break;
       case 2:
-        context.go('/my-learning');
+        AuthGateHelper.requireAuth(
+          context,
+          ref,
+          actionTitle: 'Access My Learning',
+          reason: 'Sign in to view your enrolled courses, resume video lessons, and track completion progress.',
+          onAuthenticated: () {
+            if (context.mounted) context.go('/my-learning');
+          },
+        );
         break;
       case 3:
         context.go('/wishlist');
         break;
       case 4:
-        context.go('/profile');
+        AuthGateHelper.requireAuth(
+          context,
+          ref,
+          actionTitle: 'View Your Profile',
+          reason: 'Sign in to view your learning streak, global leaderboard position, and certificates.',
+          onAuthenticated: () {
+            if (context.mounted) context.go('/profile');
+          },
+        );
         break;
     }
   }
@@ -124,7 +141,7 @@ class CustomBottomNav extends ConsumerWidget {
       ),
       child: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (index) => _onStudentTapped(index, context),
+        onDestinationSelected: (index) => _onStudentTapped(index, context, ref),
         backgroundColor: Colors.white,
         indicatorColor: AppColors.secondaryFixedDim.withOpacity(0.35),
         height: 64,

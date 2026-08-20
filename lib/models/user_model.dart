@@ -10,6 +10,7 @@ class UserModel {
   final int xp;
   final int streak;
   final List<String> badges;
+  final DateTime? lastActiveDate;
 
   const UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     this.xp = 0,
     this.streak = 0,
     this.badges = const [],
+    this.lastActiveDate,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,9 @@ class UserModel {
       xp: (json['xp'] as num?)?.toInt() ?? 0,
       streak: (json['streak'] as num?)?.toInt() ?? 0,
       badges: (json['badges'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      lastActiveDate: json['lastActiveDate'] != null
+          ? DateTime.tryParse(json['lastActiveDate'].toString())
+          : null,
     );
   }
 
@@ -59,6 +64,21 @@ class UserModel {
       'xp': xp,
       'streak': streak,
       'badges': badges,
+      if (lastActiveDate != null) 'lastActiveDate': lastActiveDate!.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toPublicProfileJson() {
+    return {
+      'id': id,
+      'name': name,
+      'photoUrl': photoUrl,
+      'bio': bio,
+      'xp': xp,
+      'streak': streak,
+      'badges': badges,
+      'role': role.name,
+      if (lastActiveDate != null) 'lastActiveDate': lastActiveDate!.toIso8601String(),
     };
   }
 
@@ -72,6 +92,7 @@ class UserModel {
     int? xp,
     int? streak,
     List<String>? badges,
+    DateTime? lastActiveDate,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -83,6 +104,7 @@ class UserModel {
       xp: xp ?? this.xp,
       streak: streak ?? this.streak,
       badges: badges ?? this.badges,
+      lastActiveDate: lastActiveDate ?? this.lastActiveDate,
     );
   }
 }

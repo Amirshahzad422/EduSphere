@@ -39,9 +39,11 @@ const _authenticatedOnlyRoutes = [
   '/my-learning',
   '/checkout',
   '/profile',
+  '/certificates',
   '/instructor',
   '/builder',
   '/earnings',
+  '/instructor/live-classes',
 ];
 
 class _RouterRefreshNotifier extends ChangeNotifier {
@@ -86,23 +88,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final isAuth = authUser != null;
       final isStudent = authUser?.role == UserRole.student;
+      final isInstructor = authUser?.role == UserRole.instructor;
 
-      // 1. Auth guard: Redirect unauthenticated users trying to access private screens
+      // 1. Auth guard: Redirect unauthenticated guests trying to access protected screens
       if (!isAuth && _authenticatedOnlyRoutes.contains(loc)) {
-        return '/login';
+        return '/login?redirect=$loc';
       }
 
-      // 2. Role guard: Prevent Students from opening Instructor pages
+      // 2. Instructor session routing: If authenticated as Instructor and lands on splash/home/marketplace, route to /instructor
+      if (isAuth && isInstructor && (loc == '/' || loc == '/splash' || loc == '/home' || loc == '/courses' || loc == '/cart')) {
+        return '/instructor';
+      }
+
+      // 3. Role guard: Prevent Students from opening Instructor pages
       if (isAuth && isStudent && _instructorOnlyRoutes.contains(loc)) {
         debugPrint('[Router Guard] Blocked student access to instructor route $loc. Redirecting to /home');
         return '/home';
-      }
-
-      // 3. Role guard: Prevent Instructors from accidentally entering student marketplace in instructor mode
-      final isInstructor = authUser?.role == UserRole.instructor;
-      if (isAuth && isInstructor && (loc == '/courses' || loc == '/cart' || loc == '/checkout')) {
-        debugPrint('[Router Guard] Blocked instructor from marketplace $loc. Redirecting to /instructor');
-        return '/instructor';
       }
 
       return null;

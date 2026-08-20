@@ -30,23 +30,74 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // Users Collection
+    // Users Collection (Private User Accounts)
     // =========================================================================
-    // Any authenticated user can read profiles; users can only modify their own profile doc.
+    // Contains private account information including email.
+    // Read & write strictly restricted to the account owner.
+    // Forces role to be 'student' at creation time (no client-side instructor self-creation).
+    // On update, prevents modifying 'role', 'id', or 'email'.
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.role == 'student';
+      allow update: if isOwner(userId) &&
+        (!('role' in resource.data) || request.resource.data.role == resource.data.role) &&
+        (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('email' in resource.data) || request.resource.data.email == resource.data.email);
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // Public Profiles Collection (Publicly Readable Profiles & Leaderboard)
+    // =========================================================================
+    // Contains only non-sensitive public profile info (name, photoUrl, bio, xp, streak, badges, role).
+    // Excludes email and private billing details.
+    // Publicly readable so guests & students can view the global leaderboard and instructor bios.
+    // Owner can create/update their public profile, with 'student' constraint on create and 'role' immutable on update.
+    match /publicProfiles/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) &&
+        (!('role' in resource.data) || request.resource.data.role == resource.data.role) &&
+        (!('id' in resource.data) || request.resource.data.id == resource.data.id);
+      allow delete: if false;
     }
 
     // =========================================================================
     // Courses Collection
     // =========================================================================
     // Published courses are publicly readable by students and guests.
-    // Only the course's instructor can create, edit, or delete the course.
+    // Owning instructor can create, edit, or delete the course.
+    // Enrolled students can atomically update ONLY the aggregate rating fields upon submitting reviews.
     match /courses/{courseId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.instructorId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.instructorId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.instructorId == request.auth.uid ||
+        (
+          exists(/databases/$(database)/documents/enrolments/$(request.auth.uid + '_' + courseId)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingSum', 'ratingCount', 'averageRating', 'rating', 'reviewCount'])
+        )
+      );
+      allow delete: if isAuthenticated() && resource.data.instructorId == request.auth.uid;
+    }
+
+    // =========================================================================
+    // Reviews Collection (STUDENT RATINGS & REVIEWS)
+    // =========================================================================
+    // Deterministic doc ID: ${userId}_${courseId}
+    // Only enrolled students can create/update their review.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() &&
+        request.auth.uid == request.resource.data.userId &&
+        request.resource.data.courseId is string &&
+        exists(/databases/$(database)/documents/enrolments/$(request.auth.uid + '_' + request.resource.data.courseId)) &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5;
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isCourseInstructor(resource.data.courseId)
+      );
     }
 
     // =========================================================================

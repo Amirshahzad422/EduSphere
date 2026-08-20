@@ -4,9 +4,6 @@ class AppConstants {
   static const String appName = 'EduSphere';
   static const String appTagline = 'Empowering Minds, Shaping Tomorrow';
 
-  // Seed / Mock asset path
-  static const String courseSeedAssetPath = 'lib/assets/mock/course_seed.json';
-
   // Storage Keys & Firestore Collections
   static const String usersCollection = 'users';
   static const String coursesCollection = 'courses';

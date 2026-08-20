@@ -57,8 +57,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           'Account created successfully as ${_selectedRole.name.toUpperCase()}!',
         );
 
-        // Role-based routing: Instructors route to Instructor Dashboard, Students route to Home
-        if (user?.role == UserRole.instructor) {
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        if (redirect != null && redirect.isNotEmpty) {
+          context.go(redirect);
+        } else if (user?.role == UserRole.instructor) {
           context.go('/instructor');
         } else {
           context.go('/home');
@@ -77,12 +79,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isGoogleLoading = true);
     try {
       final user = await ref.read(authProvider.notifier).signInWithGoogle(role: _selectedRole);
+      if (user == null) {
+        // User cancelled or closed popup
+        return;
+      }
       if (mounted) {
         AppHelpers.showSnackBar(
           context,
           'Account created via Google as ${_selectedRole.name.toUpperCase()}!',
         );
-        if (user?.role == UserRole.instructor) {
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        if (redirect != null && redirect.isNotEmpty) {
+          context.go(redirect);
+        } else if (user.role == UserRole.instructor) {
           context.go('/instructor');
         } else {
           context.go('/home');

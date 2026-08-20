@@ -8,6 +8,7 @@ import '../styles/typography.dart';
 import '../components/Button.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -370,7 +371,19 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             label: 'Proceed to Checkout',
             variant: ButtonVariant.primary,
             isFullWidth: true,
-            onPressed: () => context.go('/checkout'),
+            onPressed: () {
+              AuthGateHelper.requireAuth(
+                context,
+                ref,
+                actionTitle: 'Proceed to Checkout',
+                reason: 'Sign in to complete your purchase, receive payment receipts, and enroll instantly.',
+                onAuthenticated: () {
+                  if (context.mounted) {
+                    context.go('/checkout');
+                  }
+                },
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(

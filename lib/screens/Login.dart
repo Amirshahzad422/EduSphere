@@ -43,8 +43,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (mounted) {
         AppHelpers.showSnackBar(context, 'Welcome back, ${user?.name ?? 'Learner'}!');
-        // Role-based routing: Instructors go to Instructor Dashboard, Students go to Home
-        if (user?.role == UserRole.instructor) {
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        if (redirect != null && redirect.isNotEmpty) {
+          context.go(redirect);
+        } else if (user?.role == UserRole.instructor) {
           context.go('/instructor');
         } else {
           context.go('/home');
@@ -63,9 +65,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isGoogleLoading = true);
     try {
       final user = await ref.read(authProvider.notifier).signInWithGoogle();
+      if (user == null) {
+        // User cancelled or closed popup
+        return;
+      }
       if (mounted) {
-        AppHelpers.showSnackBar(context, 'Signed in with Google as ${user?.name ?? 'User'}!');
-        if (user?.role == UserRole.instructor) {
+        AppHelpers.showSnackBar(context, 'Signed in with Google as ${user.name}!');
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        if (redirect != null && redirect.isNotEmpty) {
+          context.go(redirect);
+        } else if (user.role == UserRole.instructor) {
           context.go('/instructor');
         } else {
           context.go('/home');

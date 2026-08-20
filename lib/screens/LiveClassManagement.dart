@@ -97,17 +97,15 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
       return;
     }
 
-    // Verify ownership
+    // Verify strict ownership
     final user = ref.read(authProvider);
-    final selectedCourse = instructorCourses.firstWhere(
-      (c) => c.id == _selectedCourseId,
-      orElse: () => instructorCourses.first,
-    );
-
-    if (user != null && selectedCourse.instructorId != user.id && selectedCourse.instructorId != 'inst_1') {
+    final isOwner = instructorCourses.any((c) => c.id == _selectedCourseId);
+    if (!isOwner || user == null) {
       AppHelpers.showSnackBar(context, 'Security check failed: You can only schedule classes for your own courses.', isError: true);
       return;
     }
+
+    final selectedCourse = instructorCourses.firstWhere((c) => c.id == _selectedCourseId);
 
     setState(() => _isSubmitting = true);
 
@@ -125,7 +123,7 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
 
       final created = await liveService.scheduleLiveClass(
         courseId: _selectedCourseId!,
-        instructorId: user?.id ?? 'inst_1',
+        instructorId: user.id,
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
         scheduledAt: scheduledDateTime,
@@ -136,7 +134,7 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
       NotificationService().sendLiveClassNotification(
         classId: created.id,
         courseTitle: selectedCourse.title,
-        instructorName: user?.name ?? 'Course Instructor',
+        instructorName: user.name.isNotEmpty ? user.name : 'Course Instructor',
         minutesUntilStart: scheduledDateTime.difference(DateTime.now()).inMinutes.clamp(0, 1440),
       );
 
@@ -221,16 +219,20 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
                 loading: () => const Center(child: AppLoader()),
                 error: (e, _) => Center(child: Text('Error loading courses: $e')),
                 data: (allCourses) {
-                  // Filter courses owned by this instructor (or default demo instructor)
+                  // Filter courses STRICTLY owned by this authenticated instructor
                   final instructorCourses = allCourses.where((c) {
-                    if (user == null) return true;
-                    return c.instructorId == user.id || c.instructorId == 'inst_1' || c.instructor.name.contains('Sarah');
+                    if (user == null) return false;
+                    final matchId = c.instructorId == user.id;
+                    final matchName = c.instructor.name.toLowerCase().trim() == user.name.toLowerCase().trim();
+                    return matchId || matchName;
                   }).toList();
 
-                  final availableCourses = instructorCourses.isNotEmpty ? instructorCourses : allCourses;
-
-                  if (_selectedCourseId == null && availableCourses.isNotEmpty) {
-                    _selectedCourseId = availableCourses.first.id;
+                  if (instructorCourses.isNotEmpty) {
+                    if (_selectedCourseId == null || !instructorCourses.any((c) => c.id == _selectedCourseId)) {
+                      _selectedCourseId = instructorCourses.first.id;
+                    }
+                  } else {
+                    _selectedCourseId = null;
                   }
 
                   return liveClassesAsync.when(
@@ -247,7 +249,7 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
                             // Left Column: Schedule Form Area (flex 7)
                             Expanded(
                               flex: 7,
-                              child: _buildScheduleForm(availableCourses),
+                              child: _buildScheduleForm(instructorCourses),
                             ),
                             const SizedBox(width: 24),
 
@@ -266,7 +268,7 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildScheduleForm(availableCourses),
+                            _buildScheduleForm(instructorCourses),
                             const SizedBox(height: 24),
                             _buildSessionsSidebar(
                               upcomingClasses: upcomingClasses,
@@ -291,6 +293,54 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
   // Schedule Form Area (Left)
   // =========================================================================
   Widget _buildScheduleForm(List<CourseModel> instructorCourses) {
+    if (instructorCourses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: AppSpacing.roundedXl,
+          border: Border.all(color: AppColors.outlineVariant.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryFixedDim.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.school_outlined, size: 40, color: AppColors.secondary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Published Courses Found',
+              style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can only schedule and conduct live classes for courses you own. Create and publish a course first.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 20),
+            AppButton(
+              label: 'Launch Course Builder',
+              variant: ButtonVariant.secondary,
+              icon: Icons.rocket_launch,
+              onPressed: () => context.go('/builder'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(

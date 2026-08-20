@@ -379,17 +379,26 @@ class _MyLearningScreenState extends ConsumerState<MyLearningScreen> {
                                             ),
                                           ),
                                         ] else ...[
-                                          SizedBox(
-                                            width: double.infinity,
-                                            child: AppButton(
-                                              label: isCompleted ? 'Review Course' : 'Resume',
-                                              variant: isCompleted ? ButtonVariant.outline : ButtonVariant.primary,
-                                              size: ButtonSize.md,
-                                              icon: isCompleted ? Icons.workspace_premium : Icons.play_arrow,
-                                              onPressed: () {
-                                                context.go('/lesson/${course.id}/$resumeLessonId');
-                                              },
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: AppButton(
+                                                  label: isCompleted ? 'Review Lessons' : 'Resume',
+                                                  variant: isCompleted ? ButtonVariant.outline : ButtonVariant.primary,
+                                                  size: ButtonSize.md,
+                                                  icon: isCompleted ? Icons.workspace_premium : Icons.play_arrow,
+                                                  onPressed: () {
+                                                    context.go('/lesson/${course.id}/$resumeLessonId');
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(Icons.star_rate_rounded, color: AppColors.star),
+                                                tooltip: 'Rate & Review Course',
+                                                onPressed: () => context.go('/course/${course.id}'),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ],

@@ -9,6 +9,7 @@ import '../providers/cart_provider.dart';
 import '../providers/enrolment_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/live_class_provider.dart';
+import '../providers/review_provider.dart';
 import '../models/course_model.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
@@ -19,6 +20,7 @@ import '../components/Loader.dart';
 import '../components/CourseCard.dart';
 import '../utils/formatters.dart';
 import '../utils/helpers.dart';
+import '../utils/auth_gate.dart';
 
 class CourseDetailsScreen extends ConsumerWidget {
   final String courseId;
@@ -27,71 +29,6 @@ class CourseDetailsScreen extends ConsumerWidget {
     super.key,
     required this.courseId,
   });
-
-  void _showRatingModal(BuildContext context, WidgetRef ref, CourseModel course) {
-    double selectedRating = 5.0;
-    final commentController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
-          title: Text('Rate & Review Course', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(course.title, style: AppTypography.bodySmall.copyWith(color: AppColors.outline), maxLines: 1),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  final starVal = index + 1.0;
-                  return IconButton(
-                    icon: Icon(
-                      starVal <= selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
-                      color: AppColors.star,
-                      size: 32,
-                    ),
-                    onPressed: () => setState(() => selectedRating = starVal),
-                  );
-                }),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: commentController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Share your feedback about this course...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            AppButton(
-              label: 'Submit Review',
-              variant: ButtonVariant.primary,
-              size: ButtonSize.sm,
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref.read(courseServiceProvider).recordCourseRating(course.id, selectedRating);
-                ref.read(courseRefreshCounterProvider.notifier).state++;
-                if (context.mounted) {
-                  AppHelpers.showSnackBar(context, 'Thank you! Your ${selectedRating.round()}★ review has been submitted.');
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -172,6 +109,7 @@ class CourseDetailsScreen extends ConsumerWidget {
                                   padding: const EdgeInsets.only(bottom: 20.0),
                                   child: _buildLiveClassBanner(
                                     context,
+                                    ref,
                                     liveClass,
                                     isEnrolled: isEnrolled,
                                     isInstructor: isOwnInstructorCourse,
@@ -257,10 +195,18 @@ class CourseDetailsScreen extends ConsumerWidget {
                                       color: isWishlisted ? AppColors.error : AppColors.outline,
                                     ),
                                     onPressed: () {
-                                      ref.read(wishlistProvider.notifier).toggleWishlist(course);
-                                      AppHelpers.showSnackBar(
+                                      AuthGateHelper.requireAuth(
                                         context,
-                                        isWishlisted ? 'Removed from wishlist' : 'Saved to wishlist!',
+                                        ref,
+                                        actionTitle: 'Save to Wishlist',
+                                        reason: 'Sign in to save courses to your wishlist and track deals.',
+                                        onAuthenticated: () {
+                                          ref.read(wishlistProvider.notifier).toggleWishlist(course);
+                                          AppHelpers.showSnackBar(
+                                            context,
+                                            isWishlisted ? 'Removed from wishlist' : 'Saved to wishlist!',
+                                          );
+                                        },
                                       );
                                     },
                                     tooltip: 'Save to Wishlist',
@@ -300,7 +246,7 @@ class CourseDetailsScreen extends ConsumerWidget {
                             ],
 
                             // Curriculum / Syllabus Accordion
-                            _buildCurriculum(context, course),
+                            _buildCurriculum(context, ref, course, isEnrolled, isOwnInstructorCourse),
                             const SizedBox(height: 28),
 
                             // Requirements
@@ -556,7 +502,13 @@ class CourseDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCurriculum(BuildContext context, CourseModel course) {
+  Widget _buildCurriculum(
+    BuildContext context,
+    WidgetRef ref,
+    CourseModel course,
+    bool isEnrolled,
+    bool isOwnInstructorCourse,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -574,7 +526,21 @@ class CourseDetailsScreen extends ConsumerWidget {
         LessonList(
           syllabus: course.syllabus,
           onLessonSelected: (lesson) {
-            context.go('/lesson/${course.id}/${lesson.id}');
+            if (!lesson.isPreview && !isEnrolled && !isOwnInstructorCourse) {
+              AuthGateHelper.requireAuth(
+                context,
+                ref,
+                actionTitle: 'Watch Lecture',
+                reason: 'This lesson is part of the full curriculum. Sign in to access your enrolled courses or enroll.',
+                onAuthenticated: () {
+                  if (context.mounted) {
+                    context.go('/lesson/${course.id}/${lesson.id}');
+                  }
+                },
+              );
+            } else {
+              context.go('/lesson/${course.id}/${lesson.id}');
+            }
           },
         ),
       ],
@@ -604,22 +570,7 @@ class CourseDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildStudentReviews(BuildContext context, WidgetRef ref, CourseModel course, bool isEnrolled) {
-    final reviews = [
-      {
-        'name': 'Sophia Martinez',
-        'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        'rating': 5,
-        'date': '2 weeks ago',
-        'comment': 'Exceptional course. The real-world production projects made everything click immediately.',
-      },
-      {
-        'name': 'James Miller',
-        'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-        'rating': 5,
-        'date': '1 month ago',
-        'comment': 'Clear explanations, zero fluff, and great instructor response time in the forum.',
-      },
-    ];
+    final reviewsAsync = ref.watch(courseReviewsStreamProvider(course.id));
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -634,66 +585,267 @@ class CourseDetailsScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Student Feedback', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
+              Text('Student Feedback & Reviews', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
               Row(
                 children: [
                   const Icon(Icons.star_rounded, color: AppColors.star, size: 20),
                   const SizedBox(width: 4),
-                  Text('${course.rating.toStringAsFixed(1)} course rating', style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w800)),
+                  Text('${course.rating.toStringAsFixed(1)} average rating', style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w800)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Rating CTA Button
+          // Rating CTA Button & count
           Row(
             children: [
-              Text('${course.reviewCount} total reviews', style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
+              Text('${course.reviewCount} verified reviews', style: AppTypography.bodySmall.copyWith(color: AppColors.outline)),
               const Spacer(),
               TextButton.icon(
                 icon: const Icon(Icons.rate_review_outlined, size: 16, color: AppColors.secondary),
-                label: const Text('Write a Review', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 12)),
-                onPressed: () => _showRatingModal(context, ref, course),
+                label: const Text('Leave a Review', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 12)),
+                onPressed: () => _showRatingModal(context, ref, course, isEnrolled),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          ...reviews.map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+          reviewsAsync.when(
+            data: (reviewsList) {
+              if (reviewsList.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Column(
                       children: [
-                        CircleAvatar(radius: 16, backgroundImage: NetworkImage(r['avatar'] as String)),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r['name'] as String, style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700)),
-                            Text(r['date'] as String, style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 10)),
-                          ],
+                        Icon(Icons.star_outline, size: 40, color: AppColors.outline.withOpacity(0.5)),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No reviews yet',
+                          style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        const Spacer(),
-                        Row(
-                          children: List.generate(
-                            r['rating'] as int,
-                            (i) => const Icon(Icons.star_rounded, size: 14, color: AppColors.star),
-                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Be the first enrolled student to review this masterclass!',
+                          style: AppTypography.bodySmall.copyWith(color: AppColors.outline),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(r['comment'] as String, style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1, color: AppColors.surfaceContainerHigh),
-                  ],
-                ),
-              )),
+                  ),
+                );
+              }
+
+              return Column(
+                children: reviewsList.map((r) {
+                  final formattedDate = DateFormat('MMM dd, yyyy').format(r.updatedAt);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppColors.secondary.withOpacity(0.1),
+                              backgroundImage: r.userPhotoUrl.isNotEmpty ? NetworkImage(r.userPhotoUrl) : null,
+                              child: r.userPhotoUrl.isEmpty
+                                  ? Text(
+                                      r.userName.isNotEmpty ? r.userName[0].toUpperCase() : 'S',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r.userName, style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700)),
+                                Text(formattedDate, style: AppTypography.labelSmall.copyWith(color: AppColors.outline, fontSize: 10)),
+                              ],
+                            ),
+                            const Spacer(),
+                            Row(
+                              children: List.generate(
+                                5,
+                                (i) => Icon(
+                                  i < r.rating.floor() ? Icons.star_rounded : Icons.star_border_rounded,
+                                  size: 14,
+                                  color: AppColors.star,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(r.reviewText, style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
+            error: (err, _) => Text('Error loading reviews: $err', style: const TextStyle(color: AppColors.error)),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showRatingModal(BuildContext context, WidgetRef ref, CourseModel course, bool isEnrolled) {
+    AuthGateHelper.requireAuth(
+      context,
+      ref,
+      actionTitle: 'Submit Course Review',
+      reason: 'Sign in to share your learning feedback and rate this course.',
+      onAuthenticated: () {
+        final user = ref.read(authProvider);
+        if (user == null) return;
+
+        if (!isEnrolled && user.role != UserRole.instructor) {
+          AppHelpers.showSnackBar(context, 'Only enrolled students can review this course. Please enroll first.');
+          return;
+        }
+
+        double selectedRating = 5.0;
+        final textController = TextEditingController();
+        bool isSubmitting = false;
+
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) {
+            return StatefulBuilder(
+              builder: (dialogCtx, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Rate & Review Masterclass', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(course.title, style: AppTypography.bodySmall.copyWith(color: AppColors.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 16),
+
+                  // Star Rating Selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starVal = index + 1.0;
+                      return IconButton(
+                        iconSize: 36,
+                        icon: Icon(
+                          starVal <= selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: AppColors.star,
+                        ),
+                        onPressed: () {
+                          setModalState(() {
+                            selectedRating = starVal;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                  Center(
+                    child: Text(
+                      '${selectedRating.toInt()} out of 5 Stars',
+                      style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.bold, color: AppColors.secondary),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Review Text Field
+                  TextField(
+                    controller: textController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Share your experience, what you learned, and feedback for the instructor...',
+                      hintStyle: AppTypography.bodySmall.copyWith(color: AppColors.outline),
+                      filled: true,
+                      fillColor: AppColors.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: AppSpacing.roundedMd,
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Submit Button
+                  AppButton(
+                    label: isSubmitting ? 'Submitting Review...' : 'Submit Verified Review',
+                    variant: ButtonVariant.primary,
+                    isFullWidth: true,
+                    isLoading: isSubmitting,
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final text = textController.text.trim();
+                            if (text.isEmpty) {
+                              AppHelpers.showSnackBar(context, 'Please enter some feedback for your review.');
+                              return;
+                            }
+
+                            setModalState(() => isSubmitting = true);
+
+                            try {
+                              await ref.read(reviewServiceProvider).submitOrUpdateReview(
+                                    userId: user.id,
+                                    userName: user.name,
+                                    userPhotoUrl: user.photoUrl ?? '',
+                                    courseId: course.id,
+                                    rating: selectedRating,
+                                    reviewText: text,
+                                  );
+
+                              ref.read(courseRefreshCounterProvider.notifier).state++;
+
+                              if (context.mounted) {
+                                Navigator.pop(ctx);
+                                AppHelpers.showSnackBar(context, 'Your review has been submitted and verified!');
+                              }
+                            } catch (e) {
+                              setModalState(() => isSubmitting = false);
+                              if (context.mounted) {
+                                AppHelpers.showSnackBar(context, 'Failed to submit review: $e');
+                              }
+                            }
+                          },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+      },
     );
   }
 
@@ -819,12 +971,22 @@ class CourseDetailsScreen extends ConsumerWidget {
               variant: ButtonVariant.primary,
               isFullWidth: true,
               icon: Icons.school,
-              onPressed: () async {
-                await ref.read(enrolmentProvider.notifier).enroll(course.id, userId);
-                if (context.mounted) {
-                  AppHelpers.showSnackBar(context, 'Successfully enrolled in ${course.title}!');
-                  context.go('/my-learning');
-                }
+              onPressed: () {
+                AuthGateHelper.requireAuth(
+                  context,
+                  ref,
+                  actionTitle: 'Enroll in Free Course',
+                  reason: 'Create a free account or sign in to enroll, track your progress, and earn verified certificates.',
+                  onAuthenticated: () async {
+                    final currentUser = ref.read(authProvider);
+                    final currentUid = currentUser?.id ?? userId;
+                    await ref.read(enrolmentProvider.notifier).enroll(course.id, currentUid);
+                    if (context.mounted) {
+                      AppHelpers.showSnackBar(context, 'Successfully enrolled in ${course.title}!');
+                      context.go('/my-learning');
+                    }
+                  },
+                );
               },
             ),
           ] else ...[
@@ -838,7 +1000,17 @@ class CourseDetailsScreen extends ConsumerWidget {
                 if (!isInCart) {
                   ref.read(cartProvider.notifier).addToCart(course);
                 }
-                context.go('/checkout');
+                AuthGateHelper.requireAuth(
+                  context,
+                  ref,
+                  actionTitle: 'Checkout & Purchase',
+                  reason: 'Sign in to complete your checkout and unlock instant course access.',
+                  onAuthenticated: () {
+                    if (context.mounted) {
+                      context.go('/checkout');
+                    }
+                  },
+                );
               },
             ),
             const SizedBox(height: 10),
@@ -885,6 +1057,7 @@ class CourseDetailsScreen extends ConsumerWidget {
 
   Widget _buildLiveClassBanner(
     BuildContext context,
+    WidgetRef ref,
     LiveClassModel liveClass, {
     required bool isEnrolled,
     required bool isInstructor,
@@ -980,7 +1153,19 @@ class CourseDetailsScreen extends ConsumerWidget {
                   size: ButtonSize.sm,
                   icon: isLive ? Icons.videocam : Icons.event,
                   onPressed: isLive || isInstructor
-                      ? () => context.go('/live-class/${liveClass.id}')
+                      ? () {
+                          AuthGateHelper.requireAuth(
+                            context,
+                            ref,
+                            actionTitle: 'Join Live Class',
+                            reason: 'Sign in to join interactive live classes, ask questions, and collaborate in real-time chat.',
+                            onAuthenticated: () {
+                              if (context.mounted) {
+                                context.go('/live-class/${liveClass.id}');
+                              }
+                            },
+                          );
+                        }
                       : null,
                 )
               else

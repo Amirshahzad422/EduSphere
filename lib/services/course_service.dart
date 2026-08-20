@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course_model.dart';
 import '../utils/constants.dart';
 import 'firebase_service.dart';
-import 'seed_service.dart';
 
 class CourseService {
   static final List<CourseModel> _locallyCreatedCourses = [];
@@ -12,38 +11,190 @@ class CourseService {
   static List<CourseModel> _baseCourses = [];
   static bool _isSyncingWithFirestore = false;
 
-  /// Returns all available courses from in-memory cache / Firestore / Seed Catalogue
+  static const List<CourseModel> _defaultProductionCourses = [
+    CourseModel(
+      id: 'course_flutter_arch',
+      title: 'Complete Flutter & Dart Architecture Masterclass',
+      category: 'Mobile Development',
+      instructorId: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+      instructor: InstructorInfo(
+        id: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+        name: 'Dr. Alexandre Rivera',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+        title: 'Senior Faculty Director',
+        bio: 'Senior Faculty Director & Lead Software Architect at EduSphere.',
+        rating: 4.95,
+        studentsCount: 1420,
+      ),
+      price: 89.99,
+      originalPrice: 119.99,
+      discount: 25.0,
+      level: 'Intermediate',
+      language: 'English',
+      duration: '14.5 hrs',
+      rating: 4.9,
+      enrolmentCount: 342,
+      thumbnailUrl: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=800',
+      subtitle: 'Master production-grade Flutter engineering, Clean Architecture, Riverpod 2.0 state management, offline caching, and responsive UI systems.',
+      whatYouWillLearn: [
+        'Build layered Clean Architecture applications with Flutter and Riverpod',
+        'Implement resilient offline-first caching and synchronisation',
+        'Stream signed media securely using Cloudflare serverless workers',
+      ],
+      requirements: ['Basic knowledge of Dart and OOP'],
+      syllabus: [],
+    ),
+    CourseModel(
+      id: 'course_cloud_serverless',
+      title: 'Full-Stack Cloud & Serverless Systems with Docker',
+      category: 'Cloud Engineering',
+      instructorId: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+      instructor: InstructorInfo(
+        id: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+        name: 'Dr. Alexandre Rivera',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+        title: 'Senior Faculty Director',
+        bio: 'Senior Faculty Director & Lead Software Architect at EduSphere.',
+        rating: 4.95,
+        studentsCount: 1420,
+      ),
+      price: 94.99,
+      originalPrice: 129.99,
+      discount: 25.0,
+      level: 'Advanced',
+      language: 'English',
+      duration: '18.0 hrs',
+      rating: 4.95,
+      enrolmentCount: 289,
+      thumbnailUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
+      subtitle: 'Architect zero-cost serverless microservices with Cloudflare Workers, secure edge pipelines, Docker container orchestration, and Cloud Firestore integration.',
+      whatYouWillLearn: [
+        'Deploy serverless Edge workers with sub-millisecond execution',
+        'Implement zero-card storage and media distribution pipelines',
+      ],
+      requirements: ['Basic Node.js / HTTP protocols'],
+      syllabus: [],
+    ),
+    CourseModel(
+      id: 'course_uiux_design',
+      title: 'Modern UI/UX Design Systems & Micro-Interactions',
+      category: 'UI/UX Design',
+      instructorId: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+      instructor: InstructorInfo(
+        id: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+        name: 'Dr. Alexandre Rivera',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+        title: 'Senior Faculty Director',
+        bio: 'Senior Faculty Director & Lead Software Architect at EduSphere.',
+        rating: 4.95,
+        studentsCount: 1420,
+      ),
+      price: 79.99,
+      originalPrice: 99.99,
+      discount: 20.0,
+      level: 'Beginner',
+      language: 'English',
+      duration: '11.5 hrs',
+      rating: 4.85,
+      enrolmentCount: 412,
+      thumbnailUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=800',
+      subtitle: 'Design world-class mobile and web user experiences with Figma, comprehensive design tokens, glassmorphism aesthetics, and fluid motion design.',
+      whatYouWillLearn: [
+        'Construct scalable design token systems in Figma and Flutter',
+        'Create micro-animations that elevate user engagement',
+      ],
+      requirements: ['No prior experience needed'],
+      syllabus: [],
+    ),
+    CourseModel(
+      id: 'course_cybersecurity',
+      title: 'Zero-Trust Cybersecurity & Threat Hunting',
+      category: 'Cybersecurity',
+      instructorId: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+      instructor: InstructorInfo(
+        id: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+        name: 'Dr. Alexandre Rivera',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+        title: 'Senior Faculty Director',
+        bio: 'Senior Faculty Director & Lead Software Architect at EduSphere.',
+        rating: 4.95,
+        studentsCount: 1420,
+      ),
+      price: 99.99,
+      originalPrice: 139.99,
+      discount: 28.0,
+      level: 'Advanced',
+      language: 'English',
+      duration: '16.5 hrs',
+      rating: 4.92,
+      enrolmentCount: 198,
+      thumbnailUrl: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=800',
+      subtitle: 'Protect enterprise infrastructure with modern zero-trust architecture, cryptographic identity validation, packet inspection, and incident response.',
+      whatYouWillLearn: [
+        'Implement least-privilege Zero-Trust network perimeters',
+        'Analyze network packets, handshake ciphers, and threat vectors',
+      ],
+      requirements: ['TCP/IP networking basics'],
+      syllabus: [],
+    ),
+    CourseModel(
+      id: 'course_databases_web3',
+      title: 'High-Performance Distributed Databases & Web3',
+      category: 'Software Engineering',
+      instructorId: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+      instructor: InstructorInfo(
+        id: 'BxnBMFJRQjMftbikQdCiSbpKFH92',
+        name: 'Dr. Alexandre Rivera',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+        title: 'Senior Faculty Director',
+        bio: 'Senior Faculty Director & Lead Software Architect at EduSphere.',
+        rating: 4.95,
+        studentsCount: 1420,
+      ),
+      price: 109.99,
+      originalPrice: 149.99,
+      discount: 25.0,
+      level: 'Intermediate',
+      language: 'English',
+      duration: '15.0 hrs',
+      rating: 4.88,
+      enrolmentCount: 235,
+      thumbnailUrl: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800',
+      subtitle: 'Master distributed document stores, immutable cryptographic ledgers, query indexing, ACID transactions, and smart contract state machines.',
+      whatYouWillLearn: [
+        'Design distributed NoSQL schemas and partition keys',
+        'Optimize multi-document atomic transactions and indexing',
+      ],
+      requirements: ['Basic database concepts'],
+      syllabus: [],
+    ),
+  ];
+
+  /// Returns all available courses directly from Firestore or memory cache
   Future<List<CourseModel>> getCourses() async {
-    // 1. If we already have base courses cached in memory, return combined list instantly (0ms delay)
+    // 1. If we already have base courses cached in memory, return combined list instantly
     if (_baseCourses.isNotEmpty) {
       _triggerBackgroundFirestoreSync();
       return _buildCombinedList(_baseCourses);
     }
 
-    // 2. Initial load: Load seed catalogue
-    final seedCourses = await SeedService.loadSeedData();
-    _baseCourses = seedCourses;
+    _baseCourses = List.from(_defaultProductionCourses);
 
-    // 3. Query Firestore if connected
+    // 2. Query Firestore live
     if (FirebaseService.isInitialized) {
       try {
         final querySnapshot = await FirebaseFirestore.instance
             .collection(AppConstants.coursesCollection)
             .get()
-            .timeout(const Duration(milliseconds: 1500));
+            .timeout(const Duration(milliseconds: 2500));
 
         if (querySnapshot.docs.isNotEmpty) {
           _baseCourses = querySnapshot.docs
               .map((doc) => CourseModel.fromJson(doc.data()))
               .toList();
-        } else {
-          debugPrint('[CourseService] Firestore courses collection empty, auto-seeding ${seedCourses.length} courses.');
-          SeedService.syncToFirestore(seedCourses).catchError((e) {
-            debugPrint('[CourseService] Sync to Firestore note: $e');
-          });
         }
       } catch (e) {
-        debugPrint('[CourseService] Firestore get note: $e. Using verified catalogue.');
+        debugPrint('[CourseService] Firestore get note: $e');
       }
     }
 
