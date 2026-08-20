@@ -17,7 +17,7 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
       : _courseService = courseService ?? CourseService(),
         super([
           EnrolmentModel(
-            id: 'enrol_1',
+            id: 'user_demo_01_course_1',
             userId: 'user_demo_01',
             courseId: 'course_1',
             progress: 0.45,
@@ -32,7 +32,7 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
             lastAccessedAt: DateTime.now().subtract(const Duration(hours: 3)),
           ),
           EnrolmentModel(
-            id: 'enrol_2',
+            id: 'user_demo_01_course_3',
             userId: 'user_demo_01',
             courseId: 'course_3',
             progress: 0.20,
@@ -110,8 +110,9 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
       return existing.first;
     }
 
+    final deterministicId = '${userId}_$courseId';
     final newEnrolment = EnrolmentModel(
-      id: 'enrol_${DateTime.now().millisecondsSinceEpoch}',
+      id: deterministicId,
       userId: userId,
       courseId: courseId,
       progress: 0.0,
@@ -135,7 +136,6 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
     try {
       if (Firebase.apps.isNotEmpty) {
         final firestore = FirebaseFirestore.instance;
-        final deterministicId = '${userId}_$courseId';
         await firestore.collection('enrolments').doc(deterministicId).set(newEnrolment.toJson());
         debugPrint('[EnrolmentService] Persisted enrollment $deterministicId for user $userId to Firestore.');
       }
@@ -190,12 +190,15 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
     }).toList();
   }
 
-  void completeLesson(String courseId, String lessonId, int totalLessons) {
+  void completeLesson(String courseId, String lessonId, int totalLessons, {String? courseTitle, String? instructorName}) {
     state = state.map((enrol) {
       if (enrol.courseId == courseId) {
         final currentCompleted = List<String>.from(enrol.completedLessons);
-        if (!currentCompleted.contains(lessonId)) {
+        final wasNotCompleted = !currentCompleted.contains(lessonId);
+        if (wasNotCompleted) {
           currentCompleted.add(lessonId);
+          // Award +50 XP for completing a lesson
+          _ref?.read(authProvider.notifier).addXp(50);
         }
         final newProgress = totalLessons > 0 ? (currentCompleted.length / totalLessons).clamp(0.0, 1.0) : 0.0;
         final updatedEnrol = enrol.copyWith(
@@ -204,6 +207,16 @@ class EnrolmentNotifier extends StateNotifier<List<EnrolmentModel>> {
           lastLessonId: lessonId,
           lastAccessedAt: DateTime.now(),
         );
+
+        // If completed 100% of the course for the first time
+        if (newProgress >= 1.0 && enrol.progress < 1.0) {
+          _ref?.read(authProvider.notifier).addXp(500);
+          _ref?.read(authProvider.notifier).awardBadge('Mastery Graduate');
+          final user = _ref?.read(authProvider);
+          if (user != null) {
+            _courseService.recordCourseRating(courseId, 5.0).catchError((_) {});
+          }
+        }
 
         _syncEnrolmentToFirestore(updatedEnrol);
         return updatedEnrol;

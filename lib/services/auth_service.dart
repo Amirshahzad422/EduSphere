@@ -245,6 +245,51 @@ class AuthService {
     debugPrint('[AuthService] User signed out successfully.');
   }
 
+  /// Gamification: Add XP to user profile
+  Future<UserModel?> addXp(int points) async {
+    if (_localUser == null) return null;
+    final newXp = _localUser!.xp + points;
+    _localUser = _localUser!.copyWith(xp: newXp);
+
+    if (FirebaseService.isInitialized && _firestore != null) {
+      try {
+        await _firestore!.collection('users').doc(_localUser!.id).update({'xp': newXp});
+      } catch (_) {}
+    }
+    debugPrint('[AuthService] ⚡ Awarded +$points XP! Total XP: $newXp');
+    return _localUser;
+  }
+
+  /// Gamification: Award badge if not already unlocked
+  Future<UserModel?> awardBadge(String badge) async {
+    if (_localUser == null) return null;
+    if (_localUser!.badges.contains(badge)) return _localUser;
+
+    final updatedBadges = [..._localUser!.badges, badge];
+    _localUser = _localUser!.copyWith(badges: updatedBadges);
+
+    if (FirebaseService.isInitialized && _firestore != null) {
+      try {
+        await _firestore!.collection('users').doc(_localUser!.id).update({'badges': updatedBadges});
+      } catch (_) {}
+    }
+    debugPrint('[AuthService] 🏆 Unlocked new badge: "$badge"!');
+    return _localUser;
+  }
+
+  /// Gamification: Update learning streak count
+  Future<UserModel?> updateStreak(int streak) async {
+    if (_localUser == null) return null;
+    _localUser = _localUser!.copyWith(streak: streak);
+
+    if (FirebaseService.isInitialized && _firestore != null) {
+      try {
+        await _firestore!.collection('users').doc(_localUser!.id).update({'streak': streak});
+      } catch (_) {}
+    }
+    return _localUser;
+  }
+
   /// Role Switcher (for development & demo testing)
   void switchRole(UserRole newRole) {
     if (_localUser != null) {

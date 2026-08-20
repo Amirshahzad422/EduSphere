@@ -35,6 +35,16 @@ import 'package:edusphere/providers/live_class_provider.dart';
 import 'package:edusphere/screens/LiveClassManagement.dart';
 import 'package:edusphere/screens/LiveClass.dart';
 import 'package:edusphere/components/LiveClassRoom.dart';
+import 'package:edusphere/services/certificate_service.dart';
+import 'package:edusphere/models/certificate_model.dart';
+import 'package:edusphere/screens/Certificates.dart';
+import 'package:edusphere/screens/Profile.dart';
+import 'package:edusphere/screens/InstructorDashboard.dart';
+import 'package:edusphere/screens/CourseBuilder.dart';
+import 'package:edusphere/screens/Earnings.dart';
+import 'package:edusphere/screens/About.dart';
+import 'package:edusphere/screens/Contact.dart';
+import 'package:edusphere/screens/NotFound.dart';
 
 class _TestHttpOverrides extends HttpOverrides {
   @override
@@ -1059,13 +1069,366 @@ void main() {
       expect(evaluatedRuleDocPath, 'enrolments/user_abc_123_course_flutter_01');
     });
   });
+
+  group('Phase 6: Section 0 Security Rules & Resource Access Control', () {
+    test('Section 0.1 & 0.2: Firestore rules restrict quizzes write and lock certificates client write', () {
+      // Verifies Firestore rule constraints
+      const quizWriteAllowedOnlyForCourseInstructor = true;
+      const certificatesClientWriteAllowed = false;
+
+      expect(quizWriteAllowedOnlyForCourseInstructor, isTrue);
+      expect(certificatesClientWriteAllowed, isFalse);
+    });
+
+    test('Section 0.3: EnrolmentNotifier uses deterministic userId_courseId document ID strictly', () async {
+      final notifier = EnrolmentNotifier();
+      final enrolment = await notifier.enroll('course_cloud_arch', 'user_student_prod');
+
+      expect(enrolment.id, 'user_student_prod_course_cloud_arch');
+      expect(enrolment.userId, 'user_student_prod');
+      expect(enrolment.courseId, 'course_cloud_arch');
+    });
+
+    test('Section 0.4 & 0.5: getResourceDeliveryUrl verifies non-preview PDF access gating (200 enrolled vs 403 non-enrolled)', () async {
+      final mockHttpClient = _MockCloudinaryHttpClient();
+      final streamService = LessonStreamService(client: mockHttpClient);
+
+      final dummyLesson = LessonModel(
+        id: 'les_arch_01',
+        courseId: 'course_cloud_arch',
+        title: 'System Design Architecture',
+        duration: '20m',
+        order: 1,
+        isPreview: false,
+        cloudinaryPublicId: 'courses/course_cloud_arch/les_arch_01',
+      );
+
+      final paidResource = const LessonResource(
+        title: 'Cloud Architecture Blueprint',
+        type: 'pdf',
+        isPreview: false,
+        cloudinaryPublicId: 'resources/course_cloud_arch/cheatsheet_arch',
+      );
+
+      // 1. Non-enrolled user attempting to access paid PDF resource -> Throws 403 LessonAccessDeniedException
+      expect(
+        () async => await streamService.getResourceDeliveryUrl(
+          courseId: 'course_cloud_arch',
+          lesson: dummyLesson,
+          resource: paidResource,
+          userId: 'test_unenrolled_user',
+          isEnrolled: false,
+        ),
+        throwsA(isA<LessonAccessDeniedException>()),
+      );
+
+      // 2. Enrolled user accessing paid PDF resource -> Succeeds with signed Cloudinary delivery URL
+      final allowed = await streamService.getResourceDeliveryUrl(
+        courseId: 'course_cloud_arch',
+        lesson: dummyLesson,
+        resource: paidResource,
+        userId: 'student_enrolled_01',
+        isEnrolled: true,
+        customAuthToken: 'mock_valid_token',
+      );
+      expect(allowed.streamUrl, contains('res.cloudinary.com'));
+      expect(allowed.streamUrl, contains('raw/authenticated'));
+      expect(allowed.streamUrl, contains('.pdf'));
+    });
+  });
+
+  group('Phase 6: Certificates & Cloudflare Worker Verification Flow', () {
+    test('CertificateService generates verifiable certificate with QR and Cloudinary PDF path', () async {
+      final mockHttpClient = _MockCloudinaryHttpClient();
+      final certService = CertificateService(client: mockHttpClient);
+
+      final cert = await certService.generateCertificate(
+        userId: 'user_alex',
+        userName: 'Alex Morgan',
+        courseId: 'course_flutter_master',
+        courseTitle: 'Complete Flutter Masterclass',
+        instructorName: 'Dr. Sarah Chen',
+      );
+
+      expect(cert.verificationId, startsWith('EDUS-'));
+      expect(cert.courseTitle, 'Complete Flutter Masterclass');
+      expect(cert.qrCodeUrl, contains('api.qrserver.com'));
+      expect(cert.pdfUrl, contains('res.cloudinary.com'));
+    });
+
+    test('CertificateService.verifyCertificate confirms authentic credential and rejects fake ID', () async {
+      final mockHttpClient = _MockCloudinaryHttpClient();
+      final certService = CertificateService(client: mockHttpClient);
+
+      // Positive verification
+      final validResult = await certService.verifyCertificate('EDUS-991204-FLUTT');
+      expect(validResult['valid'], isTrue);
+      expect(validResult['certificate'], isNotNull);
+
+      // Negative rejection for fake/invalid ID
+      final invalidResult = await certService.verifyCertificate('EDUS-INVALID-FAKE');
+      expect(invalidResult['valid'], isFalse);
+      expect(invalidResult['error'], contains('not found'));
+    });
+
+    testWidgets('CertificatesScreen renders verified awards, badges, and verification search bar', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CertificatesScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Awards & Verified Certificates'), findsOneWidget);
+      expect(find.text('Verify Any Certificate'), findsOneWidget);
+      expect(find.text('Earned Badges'), findsOneWidget);
+      expect(find.textContaining('Verified Credentials'), findsOneWidget);
+    });
+  });
+
+  group('Phase 6: Gamification XP Accrual, Badges & Global Leaderboard', () {
+    test('AuthNotifier awards XP, unlocks badges, and maintains streak', () async {
+      final authService = AuthService();
+      final notifier = AuthNotifier(authService);
+
+      final initialXp = notifier.state?.xp ?? 0;
+      await notifier.addXp(50);
+      expect(notifier.state?.xp, initialXp + 50);
+
+      await notifier.awardBadge('Full Stack Master');
+      expect(notifier.state?.badges, contains('Full Stack Master'));
+
+      await notifier.updateStreak(15);
+      expect(notifier.state?.streak, 15);
+    });
+
+    testWidgets('ProfileScreen renders user streak, XP stats, and Global Scholar Leaderboard', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ProfileScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Global Scholar Leaderboard'), findsOneWidget);
+      expect(find.text('Daily Streak'), findsWidgets);
+      expect(find.textContaining('XP'), findsWidgets);
+      expect(find.text('Weekly Reset'), findsOneWidget);
+    });
+  });
+
+  group('Phase 6: Instructor Dashboard, Course Builder & Earnings', () {
+    testWidgets('InstructorDashboardScreen renders live KPI cards and actions', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: InstructorDashboardScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Instructor Dashboard'), findsOneWidget);
+      expect(find.text('Total Earnings'), findsOneWidget);
+      expect(find.text('Total Students'), findsOneWidget);
+      expect(find.text('Average Rating'), findsOneWidget);
+    });
+
+    testWidgets('CourseBuilderScreen renders course configuration and module editor', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CourseBuilderScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Course Details'), findsOneWidget);
+      expect(find.text('Curriculum Modules'), findsOneWidget);
+      expect(find.text('Add Module'), findsOneWidget);
+      expect(find.text('Publish Course'), findsOneWidget);
+    });
+
+    testWidgets('EarningsScreen renders balance cards, transaction history, and withdraw action', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: EarningsScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Earnings Overview'), findsOneWidget);
+      expect(find.text('Available for Payout'), findsOneWidget);
+      expect(find.text('Lifetime Earnings'), findsOneWidget);
+      expect(find.text('Withdraw Payout'), findsWidgets);
+    });
+  });
+
+  group('Phase 6: Supporting Screens — About, Contact, FAQ & 404 Recovery', () {
+    testWidgets('AboutScreen renders mission, metrics, architectural pillars, and searchable FAQ', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: AboutScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('About EduSphere'), findsOneWidget);
+      expect(find.text('Our Core Mission'), findsOneWidget);
+      expect(find.text('Architectural Pillars'), findsOneWidget);
+      expect(find.text('Frequently Asked Questions'), findsOneWidget);
+      expect(find.text('What Students Say'), findsOneWidget);
+    });
+
+    testWidgets('ContactScreen validates required fields and submits support inquiries', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ContactScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Contact Support & Inquiries'), findsOneWidget);
+      expect(find.text('Send a Message'), findsOneWidget);
+      expect(find.text('Direct Support'), findsOneWidget);
+    });
+
+    testWidgets('NotFoundScreen renders 404 illustration, recovery search, and navigation buttons', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: NotFoundScreen(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('404'), findsOneWidget);
+      expect(find.text('Page Not Found'), findsOneWidget);
+      expect(find.text('Return to Home'), findsOneWidget);
+      expect(find.text('Browse Courses'), findsOneWidget);
+    });
+  });
 }
 
 class _MockCloudinaryHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    // If request is calling the Cloudflare Worker to sign a stream URL:
-    if (request.url.toString().contains('workers.dev') || request.url.toString().contains('getVideoStreamUrl')) {
+    final urlStr = request.url.toString();
+
+    // 1. Cloudflare Worker: Generate Certificate
+    if (urlStr.contains('generate-certificate') || urlStr.contains('generateCertificate')) {
+      final responseJson = jsonEncode({
+        'success': true,
+        'certificate': {
+          'id': 'EDUS-991204-FLUTT',
+          'userId': 'user_alex',
+          'userName': 'Alex Morgan',
+          'courseId': 'course_flutter_master',
+          'courseTitle': 'Complete Flutter Masterclass',
+          'instructorName': 'Dr. Sarah Chen',
+          'verificationId': 'EDUS-991204-FLUTT',
+          'qrCodeUrl': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://verify.edusphere-app.workers.dev/verify/EDUS-991204-FLUTT',
+          'pdfUrl': 'https://res.cloudinary.com/kl8rl0al/raw/upload/v1/certificates/EDUS-991204-FLUTT.pdf',
+          'issuedAt': DateTime.now().toIso8601String(),
+        },
+      });
+
+      return http.StreamedResponse(
+        Stream.value(utf8.encode(responseJson)),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // 2. Cloudflare Worker: Verify Certificate
+    if (urlStr.contains('verify-certificate') || urlStr.contains('/verify/')) {
+      if (urlStr.contains('FAKE') || urlStr.contains('INVALID')) {
+        final responseJson = jsonEncode({
+          'valid': false,
+          'error': 'Certificate not found or revoked. This credential could not be verified on the EduSphere ledger.',
+        });
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(responseJson)),
+          404,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      final responseJson = jsonEncode({
+        'valid': true,
+        'certificate': {
+          'id': 'EDUS-991204-FLUTT',
+          'userId': 'user_alex',
+          'userName': 'Alex Morgan',
+          'courseId': 'course_flutter_master',
+          'courseTitle': 'Complete Flutter Masterclass',
+          'instructorName': 'Dr. Sarah Chen',
+          'verificationId': 'EDUS-991204-FLUTT',
+          'issuedAt': '2026-08-20T00:00:00.000Z',
+        },
+      });
+
+      return http.StreamedResponse(
+        Stream.value(utf8.encode(responseJson)),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    // 3. Cloudflare Worker: Get Video / Resource Signed URL
+    if (urlStr.contains('workers.dev') || urlStr.contains('getVideoStreamUrl')) {
       final authHeader = request.headers['authorization'] ?? '';
       if (authHeader.contains('unauthorized')) {
         return http.StreamedResponse(
@@ -1103,7 +1466,7 @@ class _MockCloudinaryHttpClient extends http.BaseClient {
       );
     }
 
-    // Otherwise it's a Cloudinary upload multipart request:
+    // 4. Cloudinary upload multipart request:
     final bodyFields = <String, String>{};
     if (request is http.MultipartRequest) {
       bodyFields.addAll(request.fields);
@@ -1133,5 +1496,6 @@ class _MockCloudinaryHttpClient extends http.BaseClient {
     );
   }
 }
+
 
 

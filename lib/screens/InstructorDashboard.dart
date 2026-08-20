@@ -34,51 +34,56 @@ class InstructorDashboardScreen extends ConsumerWidget {
             children: [
               // Header with Switch to Student View and Create Course
               if (isDesktop)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Instructor Dashboard',
-                                style: AppTypography.displayMedium.copyWith(
-                                  fontSize: 32,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'Instructor Dashboard',
+                              style: AppTypography.displayMedium.copyWith(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondaryFixedDim.withOpacity(0.3),
+                                borderRadius: AppSpacing.roundedSm,
+                                border: Border.all(color: AppColors.secondary),
+                              ),
+                              child: Text(
+                                'INSTRUCTOR MODE',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: AppColors.secondary,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondaryFixedDim.withOpacity(0.3),
-                                  borderRadius: AppSpacing.roundedSm,
-                                  border: Border.all(color: AppColors.secondary),
-                                ),
-                                child: Text(
-                                  'INSTRUCTOR MODE',
-                                  style: AppTypography.labelSmall.copyWith(
-                                    color: AppColors.secondary,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Welcome back, ${user?.name ?? 'Instructor'}. Manage your published curriculum, analytics & payouts.',
-                            style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Welcome back, ${user?.name ?? 'Instructor'}. Manage your published curriculum, analytics & payouts.',
+                          style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         OutlinedButton.icon(
                           icon: const Icon(Icons.videocam, size: 18),
@@ -91,7 +96,6 @@ class InstructorDashboardScreen extends ConsumerWidget {
                           ),
                           onPressed: () => context.go('/instructor/live-classes'),
                         ),
-                        const SizedBox(width: 10),
                         OutlinedButton.icon(
                           icon: const Icon(Icons.school, size: 18),
                           label: const Text('Student View'),
@@ -107,7 +111,6 @@ class InstructorDashboardScreen extends ConsumerWidget {
                             context.go('/home');
                           },
                         ),
-                        const SizedBox(width: 10),
                         AppButton(
                           label: 'Create Course',
                           variant: ButtonVariant.secondary,

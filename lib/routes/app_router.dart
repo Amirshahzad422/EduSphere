@@ -52,6 +52,27 @@ class _RouterRefreshNotifier extends ChangeNotifier {
   }
 }
 
+CustomTransitionPage<void> _buildFadeSlidePage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curvedAnimation,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero).animate(curvedAnimation),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = _RouterRefreshNotifier(ref);
 
@@ -90,19 +111,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Standalone Screens
       GoRoute(
         path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const SplashScreen()),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const OnboardingScreen()),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const LoginScreen()),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const RegisterScreen()),
       ),
 
       // App Shell Route wrapped in MainLayout (AppBar + BottomNav)
@@ -114,91 +135,91 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/home',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const HomeScreen()),
           ),
           GoRoute(
             path: '/courses',
-            builder: (context, state) => const CoursesScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const CoursesScreen()),
           ),
           GoRoute(
             path: '/course/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? 'course_1';
-              return CourseDetailsScreen(courseId: id);
+              return _buildFadeSlidePage(key: state.pageKey, child: CourseDetailsScreen(courseId: id));
             },
           ),
           GoRoute(
             path: '/lesson/:courseId/:lessonId',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final courseId = state.pathParameters['courseId'] ?? 'course_1';
               final lessonId = state.pathParameters['lessonId'] ?? 'les_1_1_1';
-              return LessonScreen(courseId: courseId, lessonId: lessonId);
+              return _buildFadeSlidePage(key: state.pageKey, child: LessonScreen(courseId: courseId, lessonId: lessonId));
             },
           ),
           GoRoute(
             path: '/live-class/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? 'live_1';
-              return LiveClassScreen(classId: id);
+              return _buildFadeSlidePage(key: state.pageKey, child: LiveClassScreen(classId: id));
             },
           ),
           GoRoute(
             path: '/quiz/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? 'quiz_c1';
-              return QuizScreen(quizId: id);
+              return _buildFadeSlidePage(key: state.pageKey, child: QuizScreen(quizId: id));
             },
           ),
           GoRoute(
             path: '/my-learning',
-            builder: (context, state) => const MyLearningScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const MyLearningScreen()),
           ),
           GoRoute(
             path: '/certificates',
-            builder: (context, state) => const CertificatesScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const CertificatesScreen()),
           ),
           GoRoute(
             path: '/cart',
-            builder: (context, state) => const CartScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const CartScreen()),
           ),
           GoRoute(
             path: '/checkout',
-            builder: (context, state) => const CheckoutScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const CheckoutScreen()),
           ),
           GoRoute(
             path: '/wishlist',
-            builder: (context, state) => const WishlistScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const WishlistScreen()),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const ProfileScreen()),
           ),
           GoRoute(
             path: '/instructor',
-            builder: (context, state) => const InstructorDashboardScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const InstructorDashboardScreen()),
           ),
           GoRoute(
             path: '/builder',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final courseId = state.uri.queryParameters['courseId'] ?? state.extra as String?;
-              return CourseBuilderScreen(courseId: courseId);
+              return _buildFadeSlidePage(key: state.pageKey, child: CourseBuilderScreen(courseId: courseId));
             },
           ),
           GoRoute(
             path: '/instructor/live-classes',
-            builder: (context, state) => const LiveClassManagementScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const LiveClassManagementScreen()),
           ),
           GoRoute(
             path: '/earnings',
-            builder: (context, state) => const EarningsScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const EarningsScreen()),
           ),
           GoRoute(
             path: '/about',
-            builder: (context, state) => const AboutScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const AboutScreen()),
           ),
           GoRoute(
             path: '/contact',
-            builder: (context, state) => const ContactScreen(),
+            pageBuilder: (context, state) => _buildFadeSlidePage(key: state.pageKey, child: const ContactScreen()),
           ),
         ],
       ),

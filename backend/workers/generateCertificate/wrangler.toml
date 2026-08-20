@@ -1,0 +1,7 @@
+name = "generate-certificate"
+main = "index.js"
+compatibility_date = "2024-04-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "edusphere-ae8ed"
+CLOUDINARY_CLOUD_NAME = "kl8rl0al"

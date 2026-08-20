@@ -4,6 +4,44 @@ All notable changes to the EduSphere project will be documented in this file.
 
 ---
 
+## [Phase 6] - Certificates, Instructor Mode, Polish & Final Demo (Complete DoD)
+
+### Added
+- **Section 0 Security Hardening & Zero-Card Infrastructure**:
+  - **Quizzes Security Rule**: Restricted write permissions on Firestore `quizzes` collection strictly to `isCourseInstructor(courseId)`.
+  - **Certificates Security Rule**: Locked `allow write: if false;` on client side for `certificates` collection — certificates can now only be generated server-side by the Cloudflare Worker.
+  - **Deterministic Enrolment ID Consolidation**: Consolidated all enrolment document IDs to `${userId}_${courseId}` across local memory, creation workflows, and Firestore snapshot queries.
+  - **Cloudflare Worker PDF & Video Fail-Closed Security**: Configured `getVideoStreamUrl` Cloudflare Worker with strict error propagation (no silent fallback to public `/upload/` URLs) and verified `getResourceDeliveryUrl` non-preview PDF 403 access control.
+- **Verifiable Certificates & Cloudflare Workers (`backend/workers/`, `CertificateService`, `Certificates.dart`)**:
+  - **PDF Generation Cloudflare Worker (`backend/workers/generateCertificate/`)**: Generates unique cryptographic verification IDs (`EDUS-<timestamp>-<tag>`), embeds QR codes, creates public Cloudinary PDF ledger entries, and writes immutable records to Firestore.
+  - **Public Verification Endpoint (`backend/workers/verifyCertificate/`)**: Public endpoint validating authenticity by verification ID from Firestore, serving JSON and web-viewable verification badges for external employers.
+  - **Certificates Screen (`Certificates.dart`)**: Pixel-accurate match to `/stitch/edusphere_awards/` featuring real-time Firestore certificate streaming, certificate ID search & instant verification modal, credential preview, PDF download, and shareable verification URLs.
+- **Gamification System (`auth_provider.dart`, `enrolment_provider.dart`, `Profile.dart`)**:
+  - **XP Accrual**: +50 XP per completed lesson, +100 XP per completed quiz, and +500 XP upon 100% course mastery.
+  - **Badge System**: Automatic unlocking of achievements including "Mastery Graduate" and "Full Stack Master".
+  - **Global Scholar Leaderboard**: Integrated into `Profile.dart` with weekly reset timer, live rank indicators, current user highlight, streak counters, and XP badges.
+- **Instructor Dashboard & Course Builder (`InstructorDashboard.dart`, `CourseBuilder.dart`, `Earnings.dart`)**:
+  - **Live Dynamic Analytics**: Aggregates gross sales, 85% instructor revenue share, active enrollments, and ratings across all courses owned by the authenticated instructor.
+  - **Course Builder Module & Video Upload**: Supports draft curriculum creation, Cloudinary signed/preview uploads, automatic video length calculation, quiz attachment, and catalogue publishing.
+  - **Earnings & Payouts**: Real-time sales transaction logging, available payout balance computation, and interactive Stripe withdrawal simulations.
+- **Supporting Screens & Polish (`About.dart`, `Contact.dart`, `NotFound.dart`, `app_router.dart`)**:
+  - **About Screen (`About.dart`)**: Mission, core zero-card architectural pillars, live student impact counters, searchable FAQ accordion, and embedded student testimonials.
+  - **Contact Screen (`Contact.dart`)**: Validated multi-category support inquiry form, direct support emails, office locations, and operational hours.
+  - **404 Recovery Screen (`NotFound.dart`)**: Modern error card with interactive course recovery search and 1-tap home navigation.
+  - **Page Transition Animations (`app_router.dart`)**: Integrated smooth fade-slide `CustomTransitionPage` route animations across all application screens.
+
+### Tested & Verified
+- `dart analyze lib` -> 0 issues found (100% Clean).
+- `flutter test` -> 41/41 test suites passed across all 6 phases.
+- Verified Section 0 carry-over fixes: Quizzes security rules, certificates client write lock, deterministic `${userId}_${courseId}` ID consistency, Cloudflare Worker PDF 403 access control.
+- Live certificate generation & public verification flow validated.
+- XP accrual (+50/+100/+500), badge unlocking, and leaderboard rendering validated.
+- Instructor dashboard KPI calculations and course builder upload/publish validated.
+- Earnings withdrawal and Stripe transaction ledger validated.
+- About, Contact, FAQ, and 404 recovery workflows validated.
+
+---
+
 ## [Phase 5] - Lessons, Live Classes & Quizzes
 
 ### Added

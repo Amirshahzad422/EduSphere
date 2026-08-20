@@ -647,6 +647,191 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Gamification Leaderboard
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppSpacing.roundedLg,
+                  border: Border.all(color: AppColors.surfaceContainerHigh),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.emoji_events, color: AppColors.warning, size: 24),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Global Scholar Leaderboard',
+                              style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: AppSpacing.roundedFull,
+                          ),
+                          child: Text(
+                            'Weekly Reset',
+                            style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Leaderboard List
+                    ...[
+                      {
+                        'rank': 1,
+                        'name': user?.name ?? 'Alex Morgan',
+                        'xp': realXp,
+                        'streak': realStreak,
+                        'avatar': user?.photoUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+                        'isMe': true,
+                      },
+                      {
+                        'rank': 2,
+                        'name': 'Sarah Jenkins',
+                        'xp': 2300,
+                        'streak': 10,
+                        'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+                        'isMe': false,
+                      },
+                      {
+                        'rank': 3,
+                        'name': 'Marcus Vance',
+                        'xp': 1950,
+                        'streak': 8,
+                        'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+                        'isMe': false,
+                      },
+                      {
+                        'rank': 4,
+                        'name': 'Elena Rostova',
+                        'xp': 1600,
+                        'streak': 6,
+                        'avatar': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200',
+                        'isMe': false,
+                      },
+                    ].map((entry) {
+                      final isMe = entry['isMe'] == true;
+                      final rank = entry['rank'] as int;
+                      final rankColor = rank == 1
+                          ? const Color(0xFFFFD700)
+                          : (rank == 2
+                              ? const Color(0xFFC0C0C0)
+                              : (rank == 3 ? const Color(0xFFCD7F32) : AppColors.outlineVariant));
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isMe ? AppColors.secondaryFixedDim.withOpacity(0.15) : AppColors.surfaceContainerLow,
+                          borderRadius: AppSpacing.roundedMd,
+                          border: Border.all(
+                            color: isMe ? AppColors.secondary.withOpacity(0.4) : Colors.transparent,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: rankColor.withOpacity(0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$rank',
+                                  style: AppTypography.labelSmall.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: rank <= 3 ? AppColors.primary : AppColors.outline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundImage: NetworkImage(entry['avatar'].toString()),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        entry['name'].toString(),
+                                        style: AppTypography.titleSmall.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: isMe ? AppColors.secondary : AppColors.onSurface,
+                                        ),
+                                      ),
+                                      if (isMe) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondary,
+                                            borderRadius: AppSpacing.roundedFull,
+                                          ),
+                                          child: Text(
+                                            'YOU',
+                                            style: AppTypography.labelSmall.copyWith(
+                                              fontSize: 9,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.local_fire_department, size: 12, color: AppColors.warning),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '${entry['streak']}d streak',
+                                        style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${entry['xp']} XP',
+                              style: AppTypography.labelLarge.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
               const SizedBox(height: 32),
 
               // Logout Action

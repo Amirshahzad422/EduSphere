@@ -46,6 +46,27 @@ class AuthNotifier extends StateNotifier<UserModel?> {
     }
   }
 
+  Future<void> addXp(int points) async {
+    final updated = await _authService.addXp(points);
+    if (updated != null) {
+      state = updated;
+    }
+  }
+
+  Future<void> awardBadge(String badge) async {
+    final updated = await _authService.awardBadge(badge);
+    if (updated != null) {
+      state = updated;
+    }
+  }
+
+  Future<void> updateStreak(int streak) async {
+    final updated = await _authService.updateStreak(streak);
+    if (updated != null) {
+      state = updated;
+    }
+  }
+
   Future<void> signOut() async {
     await _authService.signOut();
     state = null;

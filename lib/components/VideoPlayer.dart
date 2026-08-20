@@ -12,6 +12,7 @@ class CustomVideoPlayer extends StatefulWidget {
   final int totalDurationSeconds;
   final VoidCallback? onComplete;
   final void Function(int seconds)? onPositionChanged;
+  final bool isLoadingUrl;
 
   const CustomVideoPlayer({
     super.key,
@@ -21,6 +22,7 @@ class CustomVideoPlayer extends StatefulWidget {
     this.totalDurationSeconds = 765, // 12:45 default
     this.onComplete,
     this.onPositionChanged,
+    this.isLoadingUrl = false,
   });
 
   @override
@@ -39,12 +41,15 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   bool _showControls = true;
   Timer? _hideControlsTimer;
   Timer? _fallbackTimer;
+  bool _hasSeeked = false;
+  bool _isLoadingUrl = false;
 
   final List<double> _speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
 
   @override
   void initState() {
     super.initState();
+    _isLoadingUrl = widget.isLoadingUrl;
     _currentSeconds = widget.initialPositionSeconds.clamp(0, widget.totalDurationSeconds);
     _initializePlayer();
   }
@@ -52,6 +57,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   @override
   void didUpdateWidget(CustomVideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isLoadingUrl != widget.isLoadingUrl) {
+      _isLoadingUrl = widget.isLoadingUrl;
+    }
     if (oldWidget.videoUrl != widget.videoUrl || oldWidget.title != widget.title) {
       _currentSeconds = widget.initialPositionSeconds.clamp(0, widget.totalDurationSeconds);
       _errorMessage = null;
@@ -60,6 +68,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   }
 
   Future<void> _initializePlayer() async {
+    _hasSeeked = false;
+    _isLoadingUrl = true;
+
     debugPrint('================================================================');
     debugPrint('[CustomVideoPlayer] 🎬 Initializing VideoPlayerController');
     debugPrint('[CustomVideoPlayer] 📍 Target Lesson: "${widget.title}"');
@@ -72,6 +83,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
     if (widget.videoUrl.isEmpty) {
       setState(() {
+        _isLoadingUrl = false;
         _errorMessage = 'No video URL provided for this lesson.';
       });
       return;
@@ -97,18 +109,16 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         final err = controller.value.errorDescription ?? 'Controller reported an error during initialization.';
         debugPrint('[CustomVideoPlayer] ❌ Controller Value Error: $err');
         setState(() {
+          _isLoadingUrl = false;
           _errorMessage = err;
         });
         return;
       }
 
-      if (widget.initialPositionSeconds > 0) {
-        await controller.seekTo(Duration(seconds: widget.initialPositionSeconds));
-      }
-
       controller.addListener(_onControllerUpdate);
 
       setState(() {
+        _isLoadingUrl = false;
         _isInitialized = true;
         _errorMessage = null;
       });
@@ -116,8 +126,10 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       _startHideControlsTimer();
     } catch (e) {
       debugPrint('[CustomVideoPlayer] ❌ Video player initialization exception: $e');
+      _controller = null;
       if (mounted) {
         setState(() {
+          _isLoadingUrl = false;
           _isInitialized = false;
           if (e is! UnimplementedError) {
             _errorMessage = 'Initialization exception: $e';
@@ -131,6 +143,16 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (!mounted || _controller == null) return;
 
     final controller = _controller!;
+
+    // ISSUE 1: One-time seek only after initialized AND not buffering
+    if (!_hasSeeked &&
+        controller.value.isInitialized &&
+        !controller.value.isBuffering &&
+        widget.initialPositionSeconds > 0) {
+      _hasSeeked = true;
+      controller.seekTo(Duration(seconds: widget.initialPositionSeconds));
+    }
+
     if (controller.value.hasError) {
       final err = controller.value.errorDescription ?? 'Video playback error occurred.';
       debugPrint('[CustomVideoPlayer] ❌ Controller error in listener: $err');
@@ -143,6 +165,11 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     final posSec = controller.value.position.inSeconds;
     final durSec = controller.value.duration.inSeconds;
     final isPlaying = controller.value.isPlaying;
+
+    // ISSUE 2: If real controller resumes playing after buffer, cancel fallback timer immediately
+    if (isPlaying) {
+      _fallbackTimer?.cancel();
+    }
 
     if (posSec != _currentSeconds) {
       setState(() {
@@ -180,7 +207,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         setState(() => _isPlaying = true);
         _startHideControlsTimer();
       }
-    } else {
+    } else if (_controller == null) {
       setState(() => _isPlaying = !_isPlaying);
       if (_isPlaying) {
         _startFallbackPlaybackTimer();
@@ -300,6 +327,36 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ISSUE 3: Loading state while Worker signs URL or controller is loading
+    if (_isLoadingUrl || (_controller == null && _errorMessage == null && widget.videoUrl.isEmpty)) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: _isFullscreen ? BorderRadius.zero : AppSpacing.roundedLg,
+        ),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Preparing video...',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.white54,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -71,7 +71,8 @@ service cloud.firestore {
     // =========================================================================
     match /quizzes/{quizId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() && isCourseInstructor(request.resource.data.courseId);
+      allow update, delete: if isAuthenticated() && isCourseInstructor(resource.data.courseId);
     }
 
     match /quizAttempts/{attemptId} {
@@ -87,13 +88,10 @@ service cloud.firestore {
     // Certificates Collection
     // =========================================================================
     // Publicly readable so that external verification links & QR codes work without logging in.
-    // Creation/update restricted to the certificate owner or course instructor.
+    // Client write is strictly prohibited — certificates are issued server-side by the Cloudflare Worker.
     match /certificates/{certId} {
       allow read: if true;
-      allow write: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
-        isCourseInstructor(resource.data.courseId)
-      );
+      allow write: if false;
     }
 
     // =========================================================================
