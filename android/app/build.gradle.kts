@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.verexon.edusphere"
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -36,6 +36,16 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+configurations.all {
+    exclude(group = "androidx.media3", module = "media3-exoplayer-rtsp")
 }
 
 flutter {

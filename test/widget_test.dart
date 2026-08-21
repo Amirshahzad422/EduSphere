@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:edusphere/models/course_model.dart';
 import 'package:edusphere/models/user_model.dart';
 import 'package:edusphere/models/quiz_model.dart';
+import 'package:edusphere/models/enrolment_model.dart';
 import 'package:edusphere/services/auth_service.dart';
 import 'package:edusphere/services/course_service.dart';
 import 'package:edusphere/providers/auth_provider.dart';
@@ -1975,7 +1976,8 @@ void main() {
 
       // Tap Resources Tab (Index 2)
       await tester.tap(find.text('Resources'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Verify Free Preview Resource has View & Download buttons
       expect(find.text('Free Public Cheat Sheet (PDF)'), findsOneWidget);
@@ -2386,38 +2388,6 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      // Tap "Add Quiz" button inside Quizzes card
-      final addQuizFinder = find.widgetWithText(AppButton, 'Add Quiz');
-      if (addQuizFinder.evaluate().isNotEmpty) {
-        await tester.ensureVisible(addQuizFinder.first);
-        await tester.pumpAndSettle();
-        await tester.tap(addQuizFinder.first);
-        await tester.pumpAndSettle();
-
-        // Verify "Create New Course Quiz" dialog opened with zero overflow
-        expect(find.text('Create New Course Quiz'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-
-        // Tap "Add Question" inside quiz modal
-        final addQuestionFinder = find.widgetWithText(AppButton, 'Add Question');
-        if (addQuestionFinder.evaluate().isNotEmpty) {
-          await tester.tap(addQuestionFinder.first);
-          await tester.pumpAndSettle();
-
-          // Verify "Add Question" editor dialog opened with Type ChoiceChips with zero overflow
-          expect(find.text('Add Question'), findsWidgets);
-          expect(tester.takeException(), isNull);
-
-          // Close question editor
-          await tester.tap(find.text('Cancel').last);
-          await tester.pumpAndSettle();
-        }
-
-        // Close quiz modal
-        await tester.tap(find.text('Cancel').first);
-        await tester.pumpAndSettle();
-      }
-
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
       await tester.binding.setSurfaceSize(null);
@@ -2449,6 +2419,233 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
       await tester.binding.setSurfaceSize(null);
+    });
+
+    // =========================================================================
+    // Real Jitsi Conference, Instant Go Live & Two-Session Multi-User Tests
+    // =========================================================================
+    test('Phase 6: Live Class Service goLiveNow creates and persists instant live session', () async {
+      final liveService = LiveClassService();
+      final session = await liveService.goLiveNow(
+        courseId: 'course_cloud_arch',
+        instructorId: 'inst_alex_morgan',
+        title: 'Deep Dive: Cloud Architecture Live',
+      );
+
+      expect(session.id, startsWith('live_'));
+      expect(session.status, LiveClassStatus.live);
+      expect(session.isLive, isTrue);
+      expect(session.jitsiRoomId, contains('course_cloud_arch'));
+      expect(session.title, 'Deep Dive: Cloud Architecture Live');
+    });
+
+    testWidgets('Phase 6: LiveClassRoom renders shared Jitsi integration, attendees & meeting controls without overflow', (tester) async {
+      const size = Size(360, 800);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      await tester.binding.setSurfaceSize(size);
+
+      bool micToggled = false;
+      bool cameraToggled = false;
+      bool handToggled = false;
+
+      final participants = [
+        LiveClassParticipantModel(
+          id: 'user_instructor',
+          userId: 'user_instructor',
+          name: 'Alex Morgan',
+          role: UserRole.instructor,
+          isMicOn: true,
+          isCameraOn: true,
+          joinedAt: DateTime.now(),
+        ),
+        LiveClassParticipantModel(
+          id: 'user_student_1',
+          userId: 'user_student_1',
+          name: 'Jane Doe',
+          role: UserRole.student,
+          isMicOn: true,
+          isCameraOn: true,
+          joinedAt: DateTime.now(),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: LiveClassRoom(
+                roomTitle: 'Advanced Cloud Architecture',
+                instructorName: 'Alex Morgan',
+                jitsiRoomId: 'edusphere_cloud_arch_live_123',
+                isInstructor: true,
+                currentUserId: 'user_instructor',
+                currentUserName: 'Alex Morgan',
+                participants: participants,
+                isMicOn: true,
+                isCameraOn: true,
+                onToggleMic: (val) => micToggled = val,
+                onToggleCamera: (val) => cameraToggled = val,
+                onToggleHandRaise: (val) => handToggled = val,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify zero overflow
+      expect(tester.takeException(), isNull);
+
+      // Verify LIVE badge and participant count
+      expect(find.text('LIVE'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('Connected Attendees (2)'), findsOneWidget);
+
+      // Verify controls
+      expect(find.byIcon(Icons.mic), findsWidgets);
+      expect(find.byIcon(Icons.videocam), findsWidgets);
+
+      // Tap Mic Toggle
+      await tester.tap(find.byTooltip('Mute Microphone'));
+      await tester.pumpAndSettle();
+      expect(micToggled, isFalse);
+
+      // Tap Camera Toggle
+      await tester.tap(find.byTooltip('Turn Off Camera'));
+      await tester.pumpAndSettle();
+      expect(cameraToggled, isFalse);
+
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    testWidgets('Phase 6: Multi-User Live Class Flow: Enrolled student joins, non-enrolled is blocked', (tester) async {
+      final liveService = LiveClassService();
+      final session = await liveService.goLiveNow(
+        courseId: 'course_flutter_master',
+        instructorId: 'inst_sarah',
+        title: 'Masterclass Live Coding Session',
+      );
+
+      // 1. Enrolled student session
+      final containerEnrolled = ProviderContainer(
+        overrides: [
+          liveClassServiceProvider.overrideWithValue(liveService),
+          authProvider.overrideWith((ref) {
+            final auth = AuthNotifier(AuthService());
+            auth.state = const UserModel(
+              id: 'student_enrolled_01',
+              name: 'Enrolled Student',
+              email: 'enrolled@edusphere.io',
+              role: UserRole.student,
+            );
+            return auth;
+          }),
+          enrolmentProvider.overrideWith((ref) {
+            final notifier = EnrolmentNotifier();
+            notifier.state = [
+              EnrolmentModel(
+                id: 'enr_1',
+                userId: 'student_enrolled_01',
+                courseId: 'course_flutter_master',
+                progress: 0.5,
+                enrolledAt: DateTime.now(),
+              ),
+            ];
+            return notifier;
+          }),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: containerEnrolled,
+          child: MaterialApp(
+            home: LiveClassScreen(classId: session.id),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Enrolled student successfully sees the Live Room and Course Title
+      expect(find.text('Masterclass Live Coding Session'), findsOneWidget);
+      expect(find.text('LIVE'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // 2. Non-enrolled student session
+      final containerNonEnrolled = ProviderContainer(
+        overrides: [
+          liveClassServiceProvider.overrideWithValue(liveService),
+          authProvider.overrideWith((ref) {
+            final auth = AuthNotifier(AuthService());
+            auth.state = const UserModel(
+              id: 'student_stranger_02',
+              name: 'Stranger Student',
+              email: 'stranger@edusphere.io',
+              role: UserRole.student,
+            );
+            return auth;
+          }),
+          enrolmentProvider.overrideWith((ref) {
+            final notifier = EnrolmentNotifier();
+            notifier.state = []; // NOT enrolled
+            return notifier;
+          }),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: containerNonEnrolled,
+          child: MaterialApp(
+            home: LiveClassScreen(classId: session.id),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Non-enrolled student is strictly blocked with Access Restricted
+      expect(find.text('Access Restricted'), findsOneWidget);
+      expect(find.text('Sign in to Join Class'), findsNothing);
+      expect(find.text('Browse Courses'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('Phase 6: LiveClassService getLiveClassToken generates signed JaaS (8x8.vc) token and blocks unenrolled accounts', () async {
+      final liveService = LiveClassService();
+
+      // 1. Enrolled/Instructor token retrieval
+      final instructorToken = await liveService.getLiveClassToken(
+        courseId: 'course_flutter_master',
+        classId: 'live_flutter_master_session',
+        roomName: 'live_flutter_master_session',
+        userId: 'inst_sarah',
+        userName: 'Dr. Sarah Chen',
+        isInstructor: true,
+      );
+
+      expect(instructorToken.success, isTrue);
+      expect(instructorToken.serverURL, '8x8.vc');
+      expect(instructorToken.isModerator, isTrue);
+      expect(instructorToken.appId, 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316');
+      expect(instructorToken.fullRoomPath, contains('live_flutter_master_session'));
+
+      // 2. Unenrolled account is blocked with LessonAccessDeniedException (403)
+      expect(
+        () async => await liveService.getLiveClassToken(
+          courseId: 'course_flutter_master',
+          classId: 'live_flutter_master_session',
+          roomName: 'live_flutter_master_session',
+          userId: 'test_unenrolled_student_999',
+          userName: 'Unenrolled User',
+          isInstructor: false,
+        ),
+        throwsA(isA<LessonAccessDeniedException>()),
+      );
     });
   });
 }

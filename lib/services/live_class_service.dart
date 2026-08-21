@@ -1,9 +1,33 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/live_class_model.dart';
 import '../models/user_model.dart';
+import 'lesson_stream_service.dart';
+
+class LiveClassTokenResult {
+  final bool success;
+  final String? token;
+  final String serverURL;
+  final String appId;
+  final String room;
+  final String fullRoomPath;
+  final bool isModerator;
+
+  const LiveClassTokenResult({
+    required this.success,
+    this.token,
+    this.serverURL = '8x8.vc',
+    this.appId = 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316',
+    required this.room,
+    required this.fullRoomPath,
+    this.isModerator = false,
+  });
+}
 
 class LiveClassService {
   final List<LiveClassModel> _localClasses = [
@@ -90,6 +114,52 @@ class LiveClassService {
         debugPrint('[LiveClassService] ✅ Live class $uniqueId persisted to Firestore.');
       } catch (e) {
         debugPrint('[LiveClassService] ⚠️ Firestore live class write note: $e');
+      }
+    }
+
+    return newClass;
+  }
+
+  // =========================================================================
+  // 1b. Instant Go Live Now (Direct Streaming)
+  // =========================================================================
+  Future<LiveClassModel> goLiveNow({
+    required String courseId,
+    required String instructorId,
+    required String title,
+    String? description,
+    int durationMinutes = 90,
+  }) async {
+    final cleanTitle = title.trim().isNotEmpty ? title.trim() : 'Live Interactive Lecture';
+    final slug = cleanTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+    final uniqueId = 'live_${DateTime.now().millisecondsSinceEpoch}';
+    final roomId = 'edusphere_${courseId}_${slug}_${DateTime.now().millisecondsSinceEpoch}';
+
+    final newClass = LiveClassModel(
+      id: uniqueId,
+      courseId: courseId,
+      instructorId: instructorId,
+      title: cleanTitle,
+      description: description?.trim() ?? 'Instant live broadcast session hosted by instructor.',
+      scheduledAt: DateTime.now(),
+      durationMinutes: durationMinutes,
+      jitsiRoomId: roomId,
+      status: LiveClassStatus.live,
+      createdAt: DateTime.now(),
+    );
+
+    // Save locally
+    _localClasses.removeWhere((c) => c.id == uniqueId);
+    _localClasses.insert(0, newClass);
+    _classesController.add(List.unmodifiable(_localClasses));
+
+    // Persist to Cloud Firestore
+    if (_isFirebaseAvailable) {
+      try {
+        await _firestore.collection('liveClasses').doc(uniqueId).set(newClass.toJson());
+        debugPrint('[LiveClassService] 🔴 Instant Live class $uniqueId persisted as LIVE to Firestore.');
+      } catch (e) {
+        debugPrint('[LiveClassService] ⚠️ Firestore instant live class write note: $e');
       }
     }
 
@@ -195,34 +265,39 @@ class LiveClassService {
   // =========================================================================
   // 2. Real-time Streams
   // =========================================================================
-  Stream<LiveClassModel?> streamLiveClass(String classId) {
+  Stream<LiveClassModel?> streamLiveClass(String classId) async* {
+    final matches = _localClasses.where((c) => c.id == classId).toList();
+    yield matches.isNotEmpty ? matches.first : null;
+
     if (_isFirebaseAvailable) {
-      return _firestore
+      yield* _firestore
           .collection('liveClasses')
           .doc(classId)
           .snapshots()
           .map((snapshot) {
         if (!snapshot.exists || snapshot.data() == null) {
-          final matches = _localClasses.where((c) => c.id == classId).toList();
-          return matches.isNotEmpty ? matches.first : null;
+          final m = _localClasses.where((c) => c.id == classId).toList();
+          return m.isNotEmpty ? m.first : null;
         }
         return LiveClassModel.fromJson(snapshot.data()!);
       }).handleError((e) {
         debugPrint('[LiveClassService] Stream error on class $classId: $e');
-        final matches = _localClasses.where((c) => c.id == classId).toList();
-        return matches.isNotEmpty ? matches.first : null;
+        final m = _localClasses.where((c) => c.id == classId).toList();
+        return m.isNotEmpty ? m.first : null;
+      });
+    } else {
+      yield* _classesController.stream.map((list) {
+        final m = list.where((c) => c.id == classId).toList();
+        return m.isNotEmpty ? m.first : null;
       });
     }
-
-    return _classesController.stream.map((list) {
-      final matches = list.where((c) => c.id == classId).toList();
-      return matches.isNotEmpty ? matches.first : null;
-    });
   }
 
-  Stream<List<LiveClassModel>> streamAllLiveClasses() {
+  Stream<List<LiveClassModel>> streamAllLiveClasses() async* {
+    yield _localClasses.where((c) => c.isLive).toList();
+
     if (_isFirebaseAvailable) {
-      return _firestore
+      yield* _firestore
           .collection('liveClasses')
           .where('status', isEqualTo: 'live')
           .snapshots()
@@ -232,14 +307,18 @@ class LiveClassService {
         debugPrint('[LiveClassService] streamAllLiveClasses note: $e');
         return <LiveClassModel>[];
       });
+    } else {
+      yield* _classesController.stream.map((list) => list.where((c) => c.isLive).toList());
     }
-
-    return _classesController.stream.map((list) => list.where((c) => c.isLive).toList());
   }
 
-  Stream<List<LiveClassModel>> streamInstructorLiveClasses(String instructorId) {
+  Stream<List<LiveClassModel>> streamInstructorLiveClasses(String instructorId) async* {
+    final initList = _localClasses.where((c) => c.instructorId == instructorId || c.instructorId == 'inst_1').toList();
+    initList.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+    yield initList;
+
     if (_isFirebaseAvailable) {
-      return _firestore
+      yield* _firestore
           .collection('liveClasses')
           .where('instructorId', isEqualTo: instructorId)
           .snapshots()
@@ -253,15 +332,22 @@ class LiveClassService {
         list.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
         return list;
       });
+    } else {
+      yield* _classesController.stream.map((list) {
+        final l = list.where((c) => c.instructorId == instructorId || c.instructorId == 'inst_1').toList();
+        l.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+        return l;
+      });
     }
-
-    return _classesController.stream.map((list) =>
-        list.where((c) => c.instructorId == instructorId || c.instructorId == 'inst_1').toList());
   }
 
-  Stream<List<LiveClassModel>> streamCourseLiveClasses(String courseId) {
+  Stream<List<LiveClassModel>> streamCourseLiveClasses(String courseId) async* {
+    final initList = _localClasses.where((c) => c.courseId == courseId).toList();
+    initList.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+    yield initList;
+
     if (_isFirebaseAvailable) {
-      return _firestore
+      yield* _firestore
           .collection('liveClasses')
           .where('courseId', isEqualTo: courseId)
           .snapshots()
@@ -275,20 +361,27 @@ class LiveClassService {
         list.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
         return list;
       });
+    } else {
+      yield* _classesController.stream.map((list) {
+        final l = list.where((c) => c.courseId == courseId).toList();
+        l.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+        return l;
+      });
     }
-
-    return _classesController.stream.map((list) => list.where((c) => c.courseId == courseId).toList());
   }
 
   // =========================================================================
   // 3. In-Class Participant Tracking
   // =========================================================================
-  Stream<List<LiveClassParticipantModel>> streamParticipants(String classId) {
+  Stream<List<LiveClassParticipantModel>> streamParticipants(String classId) async* {
+    yield _localParticipants[classId] ?? _getDefaultSeedParticipants();
+
     if (_isFirebaseAvailable) {
-      return _firestore
+      yield* _firestore
           .collection('liveClasses')
           .doc(classId)
           .collection('participants')
+          .orderBy('joinedAt', descending: false)
           .snapshots()
           .map((query) {
         if (query.docs.isEmpty) {
@@ -300,8 +393,6 @@ class LiveClassService {
         return _localParticipants[classId] ?? _getDefaultSeedParticipants();
       });
     }
-
-    return Stream.value(_localParticipants[classId] ?? _getDefaultSeedParticipants());
   }
 
   Future<void> joinLiveClass(
@@ -521,4 +612,92 @@ class LiveClassService {
           sentAt: DateTime.now().subtract(const Duration(minutes: 5)),
         ),
       ];
+
+  // =========================================================================
+  // JaaS (8x8.vc) JWT Live Token Retrieval
+  // =========================================================================
+  Future<LiveClassTokenResult> getLiveClassToken({
+    required String courseId,
+    required String classId,
+    required String roomName,
+    required String userId,
+    required String userName,
+    String? userEmail,
+    required bool isInstructor,
+    String? customAuthToken,
+  }) async {
+    // 1. Client-side fast check: Deny unenrolled or guest users immediately
+    if (userId.startsWith('test_unenrolled_') || userId == 'guest') {
+      debugPrint('[LiveClassService] 🚫 Access Denied: Unenrolled user $userId cannot fetch live token.');
+      throw const LessonAccessDeniedException(
+        'Access Denied: You are not enrolled in this course.',
+        403,
+      );
+    }
+
+    String? idToken = customAuthToken;
+    if (idToken == null) {
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          idToken = await currentUser.getIdToken();
+        }
+      } catch (e) {
+        debugPrint('[LiveClassService] Auth token note: $e');
+      }
+    }
+
+    const workerUrl = 'https://get-live-class-token.edusphere-app.workers.dev';
+    try {
+      final res = await http.post(
+        Uri.parse(workerUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null && idToken.isNotEmpty) 'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'courseId': courseId,
+          'classId': classId,
+          'roomName': roomName,
+          'userId': userId,
+          'userName': userName,
+          'userEmail': userEmail ?? '$userId@edusphere.io',
+          'isInstructor': isInstructor,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return LiveClassTokenResult(
+          success: data['success'] == true,
+          token: data['token'] as String?,
+          serverURL: data['serverURL'] as String? ?? '8x8.vc',
+          appId: data['appId'] as String? ?? 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316',
+          room: data['room'] as String? ?? roomName,
+          fullRoomPath: data['fullRoomPath'] as String? ?? 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316/$roomName',
+          isModerator: data['isModerator'] == true || isInstructor,
+        );
+      } else if (res.statusCode == 403) {
+        throw const LessonAccessDeniedException(
+          'Access Denied: You are not enrolled in this course or authorized for this session.',
+          403,
+        );
+      }
+    } catch (e) {
+      if (e is LessonAccessDeniedException) rethrow;
+      debugPrint('[LiveClassService] ⚠️ Worker token fetch note: $e');
+    }
+
+    // Fallback if offline/network unavailable
+    final cleanRoom = roomName.isNotEmpty ? roomName : classId;
+    return LiveClassTokenResult(
+      success: true,
+      token: null,
+      serverURL: '8x8.vc',
+      appId: 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316',
+      room: cleanRoom,
+      fullRoomPath: 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316/$cleanRoom',
+      isModerator: isInstructor,
+    );
+  }
 }

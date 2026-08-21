@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/live_class_model.dart';
+import '../services/live_class_service.dart';
 import '../styles/colors.dart';
 import '../styles/spacing.dart';
 import '../styles/typography.dart';
@@ -8,6 +10,8 @@ import '../utils/helpers.dart';
 import 'jitsi_embed.dart';
 
 class LiveClassRoom extends StatefulWidget {
+  final String classId;
+  final String courseId;
   final String roomTitle;
   final String instructorName;
   final String jitsiRoomId;
@@ -26,6 +30,8 @@ class LiveClassRoom extends StatefulWidget {
 
   const LiveClassRoom({
     super.key,
+    this.classId = '',
+    this.courseId = '',
     this.roomTitle = 'CS401: Neural Networks & Deep Learning',
     this.instructorName = 'Dr. Sarah Chen',
     this.jitsiRoomId = '',
@@ -47,31 +53,111 @@ class LiveClassRoom extends StatefulWidget {
   State<LiveClassRoom> createState() => _LiveClassRoomState();
 }
 
-enum LiveStreamEngine { nativeWebRTC, jitsiEmbed }
-
 class _LiveClassRoomState extends State<LiveClassRoom> {
-  LiveStreamEngine _engine = LiveStreamEngine.nativeWebRTC;
   bool _isScreenSharing = false;
+  String? _jaasJwtToken;
+  String? _jaasAppId;
+  String? _jaasServerURL;
 
   @override
   void initState() {
     super.initState();
-    // Default to native WebRTC stream for zero-moderator login experience
-    _engine = isNativeMediaStreamSupported()
-        ? LiveStreamEngine.nativeWebRTC
-        : LiveStreamEngine.jitsiEmbed;
+    _initJaaSAndMedia();
   }
 
-  void _handleToggleMic() {
+  Future<void> _initJaaSAndMedia() async {
+    // 1. Fetch authenticated JaaS token
+    try {
+      final tokenRes = await LiveClassService().getLiveClassToken(
+        courseId: widget.courseId.isNotEmpty ? widget.courseId : 'course_1',
+        classId: widget.classId.isNotEmpty ? widget.classId : 'live_1',
+        roomName: widget.jitsiRoomId,
+        userId: widget.currentUserId.isNotEmpty ? widget.currentUserId : 'student',
+        userName: widget.isInstructor ? widget.instructorName : widget.currentUserName,
+        isInstructor: widget.isInstructor,
+      );
+      debugPrint('[LiveClassRoom] 🔑 JaaS Token received: ${tokenRes.token != null}, server: ${tokenRes.serverURL}, appId: ${tokenRes.appId}');
+      if (mounted) {
+        setState(() {
+          _jaasJwtToken = tokenRes.token;
+          _jaasAppId = tokenRes.appId;
+          _jaasServerURL = tokenRes.serverURL;
+        });
+      }
+    } catch (e) {
+      debugPrint('[LiveClassRoom] ⚠️ Token retrieval note: $e');
+    }
+
+    // 2. Request runtime camera & microphone permissions and auto-join on mobile
+    final granted = await _requestHardwarePermissions(audio: true, video: true, isInitialPrompt: true);
+    if (!kIsWeb && widget.jitsiRoomId.isNotEmpty && mounted && granted) {
+      _handleJoinLiveStream();
+    }
+  }
+
+  Future<bool> _requestHardwarePermissions({
+    bool audio = true,
+    bool video = true,
+    bool isInitialPrompt = false,
+  }) async {
+    if (kIsWeb) return true;
+    try {
+      final permissionsToRequest = <Permission>[];
+      if (audio) permissionsToRequest.add(Permission.microphone);
+      if (video) permissionsToRequest.add(Permission.camera);
+
+      final statuses = await permissionsToRequest.request();
+      bool allGranted = true;
+
+      for (final entry in statuses.entries) {
+        debugPrint('[LiveClassRoom] Permission ${entry.key}: ${entry.value}');
+        if (!entry.value.isGranted && !entry.value.isLimited) {
+          allGranted = false;
+        }
+      }
+
+      if (!allGranted && !isInitialPrompt && mounted) {
+        AppHelpers.showSnackBar(
+          context,
+          '⚠️ Please allow Camera and Microphone permissions in App Settings to broadcast.',
+          isError: true,
+        );
+      }
+      return allGranted;
+    } catch (e) {
+      debugPrint('[LiveClassRoom] Permission request note: $e');
+      return false;
+    }
+  }
+
+  Future<void> _handleToggleMic() async {
     final nextState = !widget.isMicOn;
+    if (nextState) {
+      await _requestHardwarePermissions(audio: true, video: false);
+    }
     toggleHardwareMediaTrack(isAudio: true, enabled: nextState);
     widget.onToggleMic?.call(nextState);
+    if (mounted) {
+      AppHelpers.showSnackBar(
+        context,
+        nextState ? '🎤 Microphone enabled / unmuted' : '🔇 Microphone muted',
+      );
+    }
   }
 
-  void _handleToggleCamera() {
+  Future<void> _handleToggleCamera() async {
     final nextState = !widget.isCameraOn;
+    if (nextState) {
+      await _requestHardwarePermissions(audio: false, video: true);
+    }
     toggleHardwareMediaTrack(isAudio: false, enabled: nextState);
     widget.onToggleCamera?.call(nextState);
+    if (mounted) {
+      AppHelpers.showSnackBar(
+        context,
+        nextState ? '📷 Camera turned on' : '🚫 Camera turned off',
+      );
+    }
   }
 
   Future<void> _handleScreenShare() async {
@@ -84,47 +170,51 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
     }
   }
 
-  Future<void> _openExternalJitsi() async {
-    final cleanRoom = widget.jitsiRoomId.isNotEmpty ? widget.jitsiRoomId : 'edusphere_live_session';
-    final url = Uri.parse(
-      'https://meet.jit.si/$cleanRoom#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.requireDisplayName=false&config.disableDeepLinking=true&config.startWithAudioMuted=${!widget.isMicOn}&config.startWithVideoMuted=${!widget.isCameraOn}&userInfo.displayName=${Uri.encodeComponent(widget.currentUserName)}',
-    );
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+  Future<void> _handleJoinLiveStream() async {
+    await _requestHardwarePermissions(audio: true, video: true);
+    if (!kIsWeb) {
+      await launchMobileJitsiMeeting(
+        jitsiRoomId: widget.jitsiRoomId,
+        displayName: widget.isInstructor
+            ? '${widget.instructorName} (Instructor)'
+            : widget.currentUserName,
+        email: widget.currentUserId.isNotEmpty ? '${widget.currentUserId}@edusphere.io' : 'student@edusphere.io',
+        avatarUrl: null,
+        roomTitle: widget.roomTitle,
+        isMicOn: widget.isMicOn,
+        isCameraOn: widget.isCameraOn,
+        jwtToken: _jaasJwtToken,
+        jaasAppId: _jaasAppId,
+        serverURL: _jaasServerURL,
+      );
     }
+    // On Web: The Jitsi room renders embedded 100% inside the App UI via HtmlElementView.
   }
 
   @override
   Widget build(BuildContext context) {
     final activeParticipantCount = widget.participants.isNotEmpty ? widget.participants.length : 1;
-    final isNativeSupported = isNativeMediaStreamSupported();
     final isJitsiSupported = isJitsiEmbedSupported();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompact = screenWidth < 480;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: const Color(0xFF0B0F19),
         borderRadius: AppSpacing.roundedLg,
+        border: Border.all(color: Colors.white12),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Main Live Video Feed Canvas
+          // 1. Main Live Video Feed Stage (Adaptive Height with Zero Overflow)
           AspectRatio(
-            aspectRatio: 16 / 9,
+            aspectRatio: isCompact ? 16 / 10 : 16 / 9,
             child: Stack(
               children: [
-                // 1. Native In-App WebRTC Stream Engine (Zero Moderator Login required!)
-                if (_engine == LiveStreamEngine.nativeWebRTC && isNativeSupported)
-                  Positioned.fill(
-                    child: buildNativeCameraStream(
-                      streamKey: '${widget.jitsiRoomId}_${widget.currentUserId}',
-                      isInstructor: widget.isInstructor,
-                      isMicOn: widget.isMicOn,
-                      isCameraOn: widget.isCameraOn,
-                    ),
-                  )
-                // 2. Jitsi Meet Embed Option (with prejoin bypass)
-                else if (_engine == LiveStreamEngine.jitsiEmbed && isJitsiSupported && widget.jitsiRoomId.isNotEmpty)
+                // Jitsi Meet / JaaS (8x8.vc) Embed Option (Web Direct IFrame)
+                if (isJitsiSupported && widget.jitsiRoomId.isNotEmpty)
                   Positioned.fill(
                     child: buildJitsiEmbed(
                       jitsiRoomId: widget.jitsiRoomId,
@@ -134,9 +224,12 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                       isInstructor: widget.isInstructor,
                       isMicOn: widget.isMicOn,
                       isCameraOn: widget.isCameraOn,
+                      jwtToken: _jaasJwtToken,
+                      jaasAppId: _jaasAppId,
+                      serverURL: _jaasServerURL,
                     ),
                   )
-                // 3. Fallback Theater Canvas
+                // High-End Interactive Live Broadcast Theater (Mobile Native SDK)
                 else
                   Container(
                     decoration: const BoxDecoration(
@@ -147,168 +240,227 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                       ),
                     ),
                     child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 84,
-                            height: 84,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: widget.isCameraOn ? AppColors.secondary : AppColors.error,
-                                width: 2.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (widget.isCameraOn ? AppColors.secondary : AppColors.error).withOpacity(0.4),
-                                  blurRadius: 16,
-                                  spreadRadius: 2,
+                      child: SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: screenWidth > 64 ? screenWidth - 32 : 300),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: isCompact ? 54 : 70,
+                                  height: isCompact ? 54 : 70,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: widget.isCameraOn ? AppColors.secondary : AppColors.error,
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (widget.isCameraOn ? AppColors.secondary : AppColors.error).withOpacity(0.4),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: CircleAvatar(
+                                    backgroundColor: const Color(0xFF334155),
+                                    child: Icon(
+                                      widget.isCameraOn ? Icons.videocam : Icons.videocam_off,
+                                      size: isCompact ? 28 : 36,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  widget.isInstructor
+                                      ? '${widget.instructorName} (Broadcasting)'
+                                      : widget.instructorName,
+                                  style: (isCompact ? AppTypography.titleSmall : AppTypography.titleMedium)
+                                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Room: ${widget.jitsiRoomId}',
+                                  style: AppTypography.labelSmall.copyWith(color: AppColors.secondaryFixedDim, fontSize: 10),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.secondary,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isCompact ? 10 : 14,
+                                      vertical: isCompact ? 4 : 6,
+                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedSm),
+                                  ),
+                                  icon: const Icon(Icons.videocam, size: 14),
+                                  label: Text(
+                                    widget.isInstructor ? 'Broadcast Live (Jitsi)' : 'Join Video Feed (Jitsi)',
+                                    style: TextStyle(fontSize: isCompact ? 10.5 : 12, fontWeight: FontWeight.w800),
+                                  ),
+                                  onPressed: _handleJoinLiveStream,
                                 ),
                               ],
                             ),
-                            child: CircleAvatar(
-                              backgroundColor: const Color(0xFF334155),
-                              child: Icon(
-                                widget.isCameraOn ? Icons.videocam : Icons.videocam_off,
-                                size: 44,
-                                color: Colors.white,
-                              ),
-                            ),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            widget.isInstructor
-                                ? '${widget.instructorName} (You - Broadcasting)'
-                                : widget.instructorName,
-                            style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Room: ${widget.jitsiRoomId} • WebRTC In-App Stream',
-                            style: AppTypography.labelSmall.copyWith(color: AppColors.secondaryFixedDim),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
 
-                // Top Header Overlay: LIVE Badge, Engine Toggle, Standalone button
+                // Top Header Overlay: LIVE Badge, Participant Counter, External Button
                 Positioned(
-                  top: 10,
-                  left: 10,
-                  right: 10,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              borderRadius: AppSpacing.roundedFull,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'LIVE',
-                                  style: AppTypography.labelSmall.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: AppSpacing.roundedSm,
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.people, size: 12, color: Colors.white70),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$activeParticipantCount',
-                                  style: AppTypography.labelSmall.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          if (isNativeSupported)
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: AppSpacing.roundedSm,
-                                border: Border.all(color: AppColors.secondary.withOpacity(0.5)),
+                                color: AppColors.error,
+                                borderRadius: AppSpacing.roundedFull,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.verified_user, size: 11, color: AppColors.secondary),
-                                  const SizedBox(width: 3),
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    MediaQuery.sizeOf(context).width > 420 ? 'EduSphere WebRTC' : 'WebRTC',
+                                    'LIVE',
                                     style: AppTypography.labelSmall.copyWith(
                                       color: Colors.white,
+                                      fontWeight: FontWeight.w900,
                                       fontSize: 9.5,
-                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          const SizedBox(width: 6),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(4),
-                            tooltip: 'Open Standalone Jitsi Link',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.black.withOpacity(0.7),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: AppSpacing.roundedSm,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.people, size: 11, color: Colors.white70),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$activeParticipantCount',
+                                    style: AppTypography.labelSmall.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            icon: const Icon(Icons.open_in_new, size: 16, color: Colors.white),
-                            onPressed: _openExternalJitsi,
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!kIsWeb)
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                tooltip: 'Rejoin Live Conference',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black.withOpacity(0.7),
+                                ),
+                                icon: const Icon(Icons.videocam, size: 14, color: Colors.white),
+                                onPressed: _handleJoinLiveStream,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
 
-                // Bottom Overlay: Participant Carousel
-                Positioned(
-                  bottom: 12,
-                  left: 12,
-                  right: 12,
-                  child: SizedBox(
-                    height: 84,
+          // 2. Participant Stream Strip (Dedicated Row - Zero Collision)
+          if (widget.participants.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF131B2E),
+                border: Border(
+                  top: BorderSide(color: Colors.white12),
+                  bottom: BorderSide(color: Colors.white12),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Connected Attendees (${widget.participants.length})',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: AppColors.secondaryFixedDim,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          widget.isInstructor ? 'Broadcasting Room' : 'Interactive Session',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: Colors.white54,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 56,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: widget.participants.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
                       itemBuilder: (context, idx) {
                         final p = widget.participants[idx];
                         final isSelf = p.userId == widget.currentUserId;
@@ -316,13 +468,13 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                         final micOn = isSelf ? widget.isMicOn : p.isMicOn;
 
                         return Container(
-                          width: 68,
+                          width: 52,
                           decoration: BoxDecoration(
                             color: const Color(0xFF1E293B),
-                            borderRadius: AppSpacing.roundedMd,
+                            borderRadius: AppSpacing.roundedSm,
                             border: Border.all(
                               color: isSelf ? AppColors.secondary : Colors.white24,
-                              width: isSelf ? 2 : 1,
+                              width: isSelf ? 1.5 : 1,
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,
@@ -334,32 +486,40 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                                       width: double.infinity,
                                       height: double.infinity,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                                      errorBuilder: (_, __, ___) => Center(
+                                        child: Text(
+                                          p.name.isNotEmpty
+                                              ? p.name.substring(0, p.name.length > 2 ? 2 : p.name.length).toUpperCase()
+                                              : 'ST',
+                                          style: AppTypography.labelSmall
+                                              .copyWith(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
+                                        ),
+                                      ),
                                     )
                                   : Center(
                                       child: Text(
                                         p.name.isNotEmpty
                                             ? p.name.substring(0, p.name.length > 2 ? 2 : p.name.length).toUpperCase()
                                             : 'ST',
-                                        style: AppTypography.labelMedium
-                                            .copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                                        style: AppTypography.labelSmall
+                                            .copyWith(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
                                       ),
                                     ),
 
                               if (isSelf)
                                 Positioned(
-                                  top: 4,
-                                  left: 4,
+                                  top: 2,
+                                  left: 2,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
                                     decoration: BoxDecoration(
                                       color: AppColors.secondary,
-                                      borderRadius: AppSpacing.roundedSm,
+                                      borderRadius: BorderRadius.circular(2),
                                     ),
-                                    child: Text(
+                                    child: const Text(
                                       'YOU',
-                                      style: AppTypography.labelSmall.copyWith(
-                                        fontSize: 8,
+                                      style: TextStyle(
+                                        fontSize: 7,
                                         color: Colors.white,
                                         fontWeight: FontWeight.w900,
                                       ),
@@ -369,30 +529,30 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
 
                               if (hasHand)
                                 Positioned(
-                                  top: 4,
-                                  right: 4,
+                                  top: 2,
+                                  right: 2,
                                   child: Container(
-                                    padding: const EdgeInsets.all(2),
+                                    padding: const EdgeInsets.all(1.5),
                                     decoration: const BoxDecoration(
                                       color: AppColors.secondary,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.front_hand, size: 10, color: Colors.white),
+                                    child: const Icon(Icons.front_hand, size: 8, color: Colors.white),
                                   ),
                                 ),
 
                               Positioned(
-                                bottom: 4,
-                                right: 4,
+                                bottom: 2,
+                                right: 2,
                                 child: Container(
-                                  padding: const EdgeInsets.all(2),
+                                  padding: const EdgeInsets.all(1.5),
                                   decoration: BoxDecoration(
-                                    color: micOn ? Colors.black54 : AppColors.error,
-                                    borderRadius: AppSpacing.roundedSm,
+                                    color: micOn ? Colors.black87 : AppColors.error,
+                                    borderRadius: BorderRadius.circular(2),
                                   ),
                                   child: Icon(
                                     micOn ? Icons.mic : Icons.mic_off,
-                                    size: 10,
+                                    size: 8,
                                     color: Colors.white,
                                   ),
                                 ),
@@ -403,123 +563,127 @@ class _LiveClassRoomState extends State<LiveClassRoom> {
                       },
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Bottom Meeting Controls
+          // 3. Bottom Meeting Controls (Responsive Fitted Container)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: const BoxDecoration(
               color: Color(0xFF0F172A),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Mic Toggle
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: Icon(widget.isMicOn ? Icons.mic : Icons.mic_off, color: Colors.white, size: 18),
-                      onPressed: _handleToggleMic,
-                      style: IconButton.styleFrom(
-                        backgroundColor: widget.isMicOn ? AppColors.secondary : AppColors.error,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Mic Toggle
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: Icon(widget.isMicOn ? Icons.mic : Icons.mic_off, color: Colors.white, size: 18),
+                        onPressed: _handleToggleMic,
+                        style: IconButton.styleFrom(
+                          backgroundColor: widget.isMicOn ? AppColors.secondary : AppColors.error,
+                        ),
+                        tooltip: widget.isMicOn ? 'Mute Microphone' : 'Unmute Microphone',
                       ),
-                      tooltip: widget.isMicOn ? 'Mute Microphone' : 'Unmute Microphone',
-                    ),
-                    const SizedBox(width: 6),
+                      const SizedBox(width: 6),
 
-                    // Camera Toggle
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: Icon(widget.isCameraOn ? Icons.videocam : Icons.videocam_off, color: Colors.white, size: 18),
-                      onPressed: _handleToggleCamera,
-                      style: IconButton.styleFrom(
-                        backgroundColor: widget.isCameraOn ? AppColors.secondary : AppColors.error,
+                      // Camera Toggle
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: Icon(widget.isCameraOn ? Icons.videocam : Icons.videocam_off, color: Colors.white, size: 18),
+                        onPressed: _handleToggleCamera,
+                        style: IconButton.styleFrom(
+                          backgroundColor: widget.isCameraOn ? AppColors.secondary : AppColors.error,
+                        ),
+                        tooltip: widget.isCameraOn ? 'Turn Off Camera' : 'Turn On Camera',
                       ),
-                      tooltip: widget.isCameraOn ? 'Turn Off Camera' : 'Turn On Camera',
-                    ),
-                    const SizedBox(width: 6),
+                      const SizedBox(width: 6),
 
-                    // Screen Share
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: Icon(
-                        _isScreenSharing ? Icons.screen_share : Icons.screen_share_outlined,
-                        color: _isScreenSharing ? AppColors.secondaryFixed : Colors.white,
-                        size: 18,
-                      ),
-                      onPressed: _handleScreenShare,
-                      style: IconButton.styleFrom(
-                        backgroundColor: _isScreenSharing ? AppColors.secondary.withOpacity(0.5) : Colors.white12,
-                      ),
-                      tooltip: 'Share Screen',
-                    ),
-                    const SizedBox(width: 6),
-
-                    // Raise Hand
-                    if (!widget.isInstructor)
+                      // Screen Share
                       IconButton(
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         icon: Icon(
-                          Icons.front_hand,
-                          color: widget.isHandRaised ? AppColors.secondaryFixed : Colors.white,
+                          _isScreenSharing ? Icons.screen_share : Icons.screen_share_outlined,
+                          color: _isScreenSharing ? AppColors.secondaryFixed : Colors.white,
                           size: 18,
                         ),
-                        onPressed: widget.onToggleHandRaise != null
-                            ? () => widget.onToggleHandRaise!(!widget.isHandRaised)
-                            : null,
+                        onPressed: _handleScreenShare,
                         style: IconButton.styleFrom(
-                          backgroundColor: widget.isHandRaised ? AppColors.secondary.withOpacity(0.5) : Colors.white12,
+                          backgroundColor: _isScreenSharing ? AppColors.secondary.withOpacity(0.5) : Colors.white12,
                         ),
-                        tooltip: widget.isHandRaised ? 'Lower Hand' : 'Raise Hand',
+                        tooltip: 'Share Screen',
                       ),
-                  ],
-                ),
 
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Chat Toggle
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 18),
-                      onPressed: widget.onToggleChat,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white12,
+                      // Raise Hand
+                      if (!widget.isInstructor) ...[
+                        const SizedBox(width: 6),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          icon: Icon(
+                            Icons.front_hand,
+                            color: widget.isHandRaised ? AppColors.secondaryFixed : Colors.white,
+                            size: 18,
+                          ),
+                          onPressed: widget.onToggleHandRaise != null
+                              ? () => widget.onToggleHandRaise!(!widget.isHandRaised)
+                              : null,
+                          style: IconButton.styleFrom(
+                            backgroundColor: widget.isHandRaised ? AppColors.secondary.withOpacity(0.5) : Colors.white12,
+                          ),
+                          tooltip: widget.isHandRaised ? 'Lower Hand' : 'Raise Hand',
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Chat Toggle
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 18),
+                        onPressed: widget.onToggleChat,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white12,
+                        ),
+                        tooltip: 'Live Class Chat',
                       ),
-                      tooltip: 'Live Class Chat',
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 6),
 
-                    // End / Leave Call
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      icon: const Icon(Icons.call_end, color: Colors.white, size: 18),
-                      onPressed: widget.onLeaveClass,
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.error,
+                      // End / Leave Call
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: const Icon(Icons.call_end, color: Colors.white, size: 18),
+                        onPressed: widget.onLeaveClass,
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                        ),
+                        tooltip: widget.isInstructor ? 'End Class for All' : 'Leave Class',
                       ),
-                      tooltip: widget.isInstructor ? 'End Class for All' : 'Leave Class',
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],

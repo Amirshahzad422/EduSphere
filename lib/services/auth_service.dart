@@ -169,6 +169,9 @@ class AuthService {
           final GoogleSignIn googleSignIn = GoogleSignIn(
             serverClientId: '1078631241013-dbq8s09qapseiq8grgsf83tc2hk7in74.apps.googleusercontent.com',
           );
+          try {
+            await googleSignIn.signOut();
+          } catch (_) {}
           final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
           if (googleUser == null) {
             debugPrint('[AuthService] Google sign-in cancelled by user on mobile.');
@@ -359,6 +362,24 @@ class AuthService {
         debugPrint('[AuthService] Firebase signOut error: $e');
       }
     }
+
+    if (!kIsWeb) {
+      try {
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          serverClientId: '1078631241013-dbq8s09qapseiq8grgsf83tc2hk7in74.apps.googleusercontent.com',
+        );
+        try {
+          await googleSignIn.disconnect();
+          debugPrint('[AuthService] 🚪 GoogleSignIn disconnected (account cache cleared).');
+        } catch (discErr) {
+          debugPrint('[AuthService] ℹ️ GoogleSignIn disconnect note ($discErr) -> falling back to signOut()');
+          await googleSignIn.signOut();
+        }
+      } catch (e) {
+        debugPrint('[AuthService] Google sign-out cleanup error: $e');
+      }
+    }
+
     _localUser = null;
     debugPrint('[AuthService] User signed out successfully.');
   }

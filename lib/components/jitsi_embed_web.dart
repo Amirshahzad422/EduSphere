@@ -4,8 +4,7 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 
 final Set<String> _registeredViews = {};
-html.MediaStream? _currentMediaStream;
-html.VideoElement? _activeVideoElement;
+html.IFrameElement? _activeIframe;
 
 Widget buildNativeCameraStream({
   required String streamKey,
@@ -14,101 +13,8 @@ Widget buildNativeCameraStream({
   required bool isCameraOn,
   VoidCallback? onStreamStarted,
 }) {
-  final viewId = 'local-camera-stream-$streamKey';
-
-  if (!_registeredViews.contains(viewId)) {
-    ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
-      final video = html.VideoElement()
-        ..autoplay = true
-        ..muted = isInstructor // Mute local feedback for instructor
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.objectFit = 'cover'
-        ..style.backgroundColor = '#0F172A'
-        ..setAttribute('playsinline', 'true');
-
-      _activeVideoElement = video;
-
-      // Request browser hardware camera & microphone directly with ZERO external login
-      html.window.navigator.mediaDevices?.getUserMedia({
-        'video': {
-          'width': {'ideal': 1280},
-          'height': {'ideal': 720},
-          'facingMode': 'user',
-        },
-        'audio': true,
-      }).then((stream) {
-        _currentMediaStream = stream;
-        video.srcObject = stream;
-        
-        // Sync initial track states
-        for (final audioTrack in stream.getAudioTracks()) {
-          audioTrack.enabled = isMicOn;
-        }
-        for (final videoTrack in stream.getVideoTracks()) {
-          videoTrack.enabled = isCameraOn;
-        }
-        onStreamStarted?.call();
-      }).catchError((err) {
-        debugPrint('[LiveClass] Camera/Mic access prompt note: $err');
-      });
-
-      return video;
-    });
-    _registeredViews.add(viewId);
-  }
-
-  return HtmlElementView(viewType: viewId);
-}
-
-void toggleHardwareMediaTrack({required bool isAudio, required bool enabled}) {
-  if (_currentMediaStream == null) return;
-
-  if (isAudio) {
-    for (final track in _currentMediaStream!.getAudioTracks()) {
-      track.enabled = enabled;
-    }
-  } else {
-    for (final track in _currentMediaStream!.getVideoTracks()) {
-      track.enabled = enabled;
-    }
-  }
-}
-
-void stopHardwareMediaStream() {
-  try {
-    if (_currentMediaStream != null) {
-      for (final track in _currentMediaStream!.getTracks()) {
-        track.stop();
-      }
-      _currentMediaStream = null;
-    }
-    if (_activeVideoElement != null) {
-      _activeVideoElement!.srcObject = null;
-      _activeVideoElement = null;
-    }
-    debugPrint('[LiveClass] 🛑 Hardware camera and microphone stream released.');
-  } catch (e) {
-    debugPrint('[LiveClass] Error releasing media stream: $e');
-  }
-}
-
-Future<bool> startHardwareScreenShare() async {
-  try {
-    final mediaDevices = html.window.navigator.mediaDevices as dynamic;
-    final displayStream = await mediaDevices?.getDisplayMedia({
-      'video': true,
-      'audio': true,
-    });
-    if (displayStream != null && _activeVideoElement != null) {
-      _currentMediaStream = displayStream;
-      _activeVideoElement!.srcObject = displayStream;
-      return true;
-    }
-  } catch (e) {
-    debugPrint('[LiveClass] Screen share cancelled/error: $e');
-  }
-  return false;
+  // Always route to shared Jitsi conference on web
+  return const SizedBox.shrink();
 }
 
 Widget buildJitsiEmbed({
@@ -117,31 +23,46 @@ Widget buildJitsiEmbed({
   required bool isInstructor,
   required bool isMicOn,
   required bool isCameraOn,
+  String? jwtToken,
+  String? jaasAppId,
+  String? serverURL,
 }) {
   final cleanRoomId = jitsiRoomId.isNotEmpty ? jitsiRoomId : 'edusphere_live_session';
-  final viewId = 'jitsi-frame-$cleanRoomId';
+  final appId = (jaasAppId != null && jaasAppId.isNotEmpty)
+      ? jaasAppId
+      : 'vpaas-magic-cookie-5c5675ce628e421aafac215917f37316';
+  final server = (serverURL != null && serverURL.isNotEmpty) ? serverURL : '8x8.vc';
+  final viewId = 'jitsi-frame-$cleanRoomId-${jwtToken?.hashCode ?? 0}';
 
   if (!_registeredViews.contains(viewId)) {
     ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
-      // Configuration parameters bypassing pre-join & moderator waiting rooms
+      // JaaS (8x8.vc) Standard Configuration
       final configParams = [
         'config.prejoinConfig.enabled=false',
         'config.prejoinPageEnabled=false',
-        'config.requireDisplayName=false',
-        'config.disableDeepLinking=true',
-        'config.enableInsecureRoomNameAllowed=true',
         'config.startWithAudioMuted=${!isMicOn}',
         'config.startWithVideoMuted=${!isCameraOn}',
         'userInfo.displayName=${Uri.encodeComponent(displayName)}',
       ].join('&');
 
+      final jwtQuery = (jwtToken != null && jwtToken.isNotEmpty)
+          ? 'jwt=${Uri.encodeComponent(jwtToken)}&'
+          : '';
+
+      final targetUrl = (jwtToken != null && jwtToken.isNotEmpty)
+          ? 'https://$server/$appId/$cleanRoomId?$jwtQuery#$configParams'
+          : 'https://meet.jit.si/$cleanRoomId#$configParams';
+
       final iframe = html.IFrameElement()
-        ..src = 'https://meet.jit.si/$cleanRoomId#$configParams'
+        ..src = targetUrl
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'
+        ..style.backgroundColor = '#0F172A'
         ..allow = 'camera; microphone; display-capture; autoplay; clipboard-write; fullscreen'
         ..setAttribute('allowfullscreen', 'true');
+
+      _activeIframe = iframe;
       return iframe;
     });
     _registeredViews.add(viewId);
@@ -150,5 +71,38 @@ Widget buildJitsiEmbed({
   return HtmlElementView(viewType: viewId);
 }
 
+Future<void> launchMobileJitsiMeeting({
+  required String jitsiRoomId,
+  required String displayName,
+  required String email,
+  required String? avatarUrl,
+  required String roomTitle,
+  required bool isMicOn,
+  required bool isCameraOn,
+  VoidCallback? onTerminated,
+}) async {
+  // On web, embed is used directly in-canvas
+}
+
+void toggleHardwareMediaTrack({required bool isAudio, required bool enabled}) {
+  try {
+    if (_activeIframe != null && _activeIframe!.contentWindow != null) {
+      // Send postMessage to Jitsi Iframe if API listener is active
+      _activeIframe!.contentWindow!.postMessage({
+        'type': isAudio ? 'toggleAudio' : 'toggleVideo',
+        'enabled': enabled,
+      }, '*');
+    }
+  } catch (e) {
+    debugPrint('[JitsiWeb] PostMessage note: $e');
+  }
+}
+
+void stopHardwareMediaStream() {
+  _activeIframe = null;
+}
+
+Future<bool> startHardwareScreenShare() async => false;
+
 bool isJitsiEmbedSupported() => true;
-bool isNativeMediaStreamSupported() => true;
+bool isNativeMediaStreamSupported() => false;

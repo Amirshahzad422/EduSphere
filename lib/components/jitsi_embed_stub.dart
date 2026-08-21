@@ -16,9 +16,26 @@ Widget buildJitsiEmbed({
   required bool isInstructor,
   required bool isMicOn,
   required bool isCameraOn,
+  String? jwtToken,
+  String? jaasAppId,
+  String? serverURL,
 }) {
   return const SizedBox.shrink();
 }
+
+Future<void> launchMobileJitsiMeeting({
+  required String jitsiRoomId,
+  required String displayName,
+  required String email,
+  required String? avatarUrl,
+  required String roomTitle,
+  required bool isMicOn,
+  required bool isCameraOn,
+  String? jwtToken,
+  String? jaasAppId,
+  String? serverURL,
+  VoidCallback? onTerminated,
+}) async {}
 
 void toggleHardwareMediaTrack({required bool isAudio, required bool enabled}) {}
 

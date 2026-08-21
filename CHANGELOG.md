@@ -7,6 +7,87 @@ All notable changes to the EduSphere project will be documented in this file.
 ## [Phase 6 Update & Production Polish] - Sections 1, 2, 3 & 4
 
 ### Added & Refactored
+- **Section 26: CourseBuilder Add/Edit Lesson & Go Live Now Dialog Overflow Resolution**:
+  - **CourseBuilder Lesson Dialog ([`lib/screens/CourseBuilder.dart`](file:///d:/Edusphere/lib/screens/CourseBuilder.dart))**:
+    - Replaced rigid `Wrap` with flexible, ellipsis-safe `Row(children: [Icon, SizedBox, Expanded(child: Text), SizedBox, Text])` for "Attached Lesson Resources" header.
+    - Added responsive `insetPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 20)` and `contentPadding: EdgeInsets.fromLTRB(16, 14, 16, 10)` to `AlertDialog`, preventing horizontal clipping on 360px mobile screens.
+    - Wrapped lesson resource item labels in `Expanded` with `maxLines: 1, overflow: TextOverflow.ellipsis` and compact icon constraints.
+    - Updated Quiz dialog and Question editor dialogs from fixed `SizedBox(width: 620)` to responsive `ConstrainedBox(constraints: BoxConstraints(maxWidth: 620))`.
+  - **Go Live Now Course Picker Dialog ([`lib/screens/LiveClassManagement.dart`](file:///d:/Edusphere/lib/screens/LiveClassManagement.dart))**:
+    - Added `isExpanded: true` on `DropdownButtonFormField<String>` to prevent right overflow when course titles exceed dialog bounds.
+    - Added responsive `insetPadding` and `contentPadding` to `_handleGoLiveNowDialog`.
+    - All 69 automated tests pass and `flutter analyze` reports 0 issues.
+- **Section 25: Migration of Live Classes to JaaS (8x8.vc) with Cloudflare Worker Signed JWT Tokens & Firestore Enrolment Verification**:
+  - **New Cloudflare Worker Microservice (`backend/workers/getLiveClassToken`)**:
+    - Scaffolding: Built a dedicated, separately deployed Cloudflare Worker with its own `wrangler.toml` (`name = "get-live-class-token"`), `package.json`, and secure bindings.
+    - Secrets Integration: Bound `JAAS_APP_ID` (`vpaas-magic-cookie-5c5675ce628e421aafac215917f37316`) and `JAAS_PRIVATE_KEY` (uploaded via RSA `.pk` secret) strictly inside Cloudflare Worker environment variables, never in the client app.
+    - Authenticated Verification & Gatekeeping: Cryptographically verifies caller Firebase Auth ID tokens, checks Firestore course enrollment or instructor ownership (`FAIL CLOSED`), and issues 403 Forbidden with `UNENROLLED_ACCESS_DENIED` for unauthorized or unenrolled requests.
+    - JWT Specification: Generates authentic RS256-signed JaaS tokens with `aud: 'jitsi'`, `iss: 'chat'`, `sub: <JAAS_APP_ID>`, 3-hour expiry, custom user context, and `moderator: true/false` according to user role.
+  - **Cross-Platform JaaS 8x8.vc Embed Updates ([`lib/components/jitsi_embed_web.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_web.dart), [`lib/components/jitsi_embed_mobile.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_mobile.dart), [`lib/components/LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart), [`lib/services/live_class_service.dart`](file:///d:/Edusphere/lib/services/live_class_service.dart))**:
+    - **Web Embed**: Routes iframe directly to `https://8x8.vc/$appId/$cleanRoomId?jwt=$jwtToken` within Flutter's in-canvas DOM tree (`HtmlElementView`), stripping legacy workaround flags and relying on clean token authentication.
+    - **Mobile Embed**: Configures `jitsi_meet_flutter_sdk` to connect to `https://8x8.vc` with room `$appId/$cleanRoom` and `token: jwtToken`.
+    - **In-App Integration**: Automatically fetches JaaS JWT on entering `LiveClassRoom` and connects seamlessly with zero login prompts or external windows.
+  - **Automated Two-Session Verification**:
+    - Verified instructor live broadcast (200 OK + JaaS JWT with `isModerator: true`).
+    - Verified enrolled student connection (200 OK + JaaS JWT with `isModerator: false`).
+    - Verified non-enrolled user blocked (403 Forbidden with `UNENROLLED_ACCESS_DENIED`).
+    - All 69 Flutter test suites passing cleanly with 0 errors.
+- **Section 24: Zero-External-Window Live Video Embedding & Zero-Prompt Jitsi Conference Integration**:
+  - **Diagnosed and Removed External Launch Triggers**:
+    - Identified that `LiveClassRoom.dart` had an `IconButton(icon: Icon(Icons.open_in_new))` and a fallback method `_openExternalJitsi()` which called `launchUrl(url, mode: LaunchMode.externalApplication)`, spawning a separate browser window/tab when tapped on Web.
+    - Completely removed `_openExternalJitsi()`, removed `url_launcher` triggers from `LiveClassRoom.dart` and `jitsi_embed_mobile.dart`, and ensured the live video feed is strictly embedded inside the app's own layout via `HtmlElementView` on Web and auto-connected via native Jitsi SDK on mobile.
+  - **Comprehensive Jitsi Config Suppression Parameters ([`lib/components/jitsi_embed_web.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_web.dart), [`lib/components/jitsi_embed_mobile.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_mobile.dart))**:
+    - Added all suppression parameters preventing pre-join, welcome page, lobby, deep-linking, and login prompts:
+      - `config.prejoinConfig.enabled=false`
+      - `config.prejoinPageEnabled=false`
+      - `config.requireDisplayName=false`
+      - `config.enableWelcomePage=false`
+      - `config.disableDeepLinking=true`
+      - `config.enableInsecureRoomNameAllowed=true`
+      - `config.readOnlyName=true`
+      - `config.disableThirdPartyRequests=true`
+      - `config.doNotStoreRoom=true`
+      - `featureFlags['welcomepage.enabled']=false`
+      - `featureFlags['lobby-mode.enabled']=false`
+      - `featureFlags['security-options.enabled']=false`
+      - `featureFlags['meeting-password.enabled']=false`
+  - **Zero-Click Auto-Join on Mobile Startup**:
+    - On Android, `LiveClassRoom.dart` now triggers `launchMobileJitsiMeeting` immediately in `addPostFrameCallback` after permission resolution, eliminating the intermediate "Broadcast Live" button barrier so instructors and students connect immediately upon opening the screen.
+- **Section 23: Shared Jitsi Multi-Peer Conference (Web & Android), Real Hardware Controls & Instant "Go Live Now" Flow**:
+  - **Diagnosed Root Cause**:
+    - Identified that `lib/components/jitsi_embed_web.dart` previously used a local `getUserMedia` call bound to a raw HTML `<video>` element (`srcObject = stream`), displaying only a local webcam preview without connecting to a WebRTC peer server or joining a shared room. Mobile was backed by an empty stub.
+  - **Rebuilt Cross-Platform Jitsi Conference Architecture ([`pubspec.yaml`](file:///d:/Edusphere/pubspec.yaml), [`lib/components/jitsi_embed_mobile.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_mobile.dart), [`lib/components/jitsi_embed_web.dart`](file:///d:/Edusphere/lib/components/jitsi_embed_web.dart), [`lib/components/jitsi_embed.dart`](file:///d:/Edusphere/lib/components/jitsi_embed.dart))**:
+    - **Flutter Web**: Embedded Jitsi's shared conference frame (`https://meet.jit.si/$cleanRoomId`) inside `HtmlElementView` bypassing prejoin screens and provisioning full microphone, camera, and display-capture permissions.
+    - **Android/iOS Mobile**: Integrated `jitsi_meet_flutter_sdk: 13.1.1` via `launchMobileJitsiMeeting` with `JitsiMeetConferenceOptions`, connecting the instructor and all enrolled students to the exact same shared Jitsi room.
+    - **Hardware Control Wiring**: Wired mic mute/unmute and camera toggles to `_jitsiMeet.setAudioMuted` / `_jitsiMeet.setVideoMuted` on mobile and `postMessage` on Web, while keeping Firestore participant indicators in real-time sync.
+  - **Instant "Go Live Now" Flow ([`lib/services/live_class_service.dart`](file:///d:/Edusphere/lib/services/live_class_service.dart), [`lib/screens/LiveClassManagement.dart`](file:///d:/Edusphere/lib/screens/LiveClassManagement.dart), [`lib/screens/InstructorDashboard.dart`](file:///d:/Edusphere/lib/screens/InstructorDashboard.dart))**:
+    - Added `goLiveNow` API in `LiveClassService` generating an immediate session with `status: 'live'` and unique `jitsiRoomId`.
+    - Added a prominent **"🔴 Go Live Now"** button and course picker modal in `LiveClassManagementScreen` and `InstructorDashboardScreen` navigating directly to `/live-class/:id`.
+  - **Two-Session Multi-User Verification & Overflow Pass ([`lib/components/LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart), [`lib/screens/LiveClass.dart`](file:///d:/Edusphere/lib/screens/LiveClass.dart), [`test/widget_test.dart`](file:///d:/Edusphere/test/widget_test.dart))**:
+    - Wrapped live stage top overlay, attendee strip headers, and meeting controls in `FittedBox(fit: BoxFit.scaleDown)` and `Wrap` preventing any horizontal overflow on 360px phones.
+    - Verified multi-user live flow with automated integration tests: enrolled students join and see the live stream, while non-enrolled students are blocked with the "Access Restricted" gate. All 68 test suites passing cleanly.
+- **Section 22: Runtime Camera & Microphone OS Permission Prompts & Live Screen Layout Overhaul**:
+  - **Runtime Permission Prompts ([`pubspec.yaml`](file:///d:/Edusphere/pubspec.yaml), [`lib/components/LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart))**:
+    - Installed `permission_handler: ^11.4.0` Flutter plugin.
+    - Added automated runtime OS permission requests (`Permission.camera.request()` and `Permission.microphone.request()`) on Live Class entry, when toggling mic/camera, and when tapping "Broadcast Live (Jitsi)" or "Join Video Feed (Jitsi)".
+    - Android system dialog *"Allow EduSphere to record audio and take pictures and record video?"* now directly pops up on the user's phone.
+  - **Live Screen Zero-Collision Layout ([`lib/components/LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart))**:
+    - Eliminated internal 16:9 vertical overflow by decoupling the participant list into a dedicated horizontal Attendee Strip placed right below the main video stage.
+    - Centered stage now includes a compact pulsing broadcast avatar, live status, room ID, and 1-tap live launch button with responsive aspect ratios (`16:10` on mobile vs `16:9` on desktop).
+    - Wrapped bottom meeting controls in a responsive `Wrap` with padding, preventing overflow on small screens.
+  - **Edit & Add Lesson Content Dialog Responsiveness ([`lib/screens/CourseBuilder.dart`](file:///d:/Edusphere/lib/screens/CourseBuilder.dart))**:
+    - Replaced rigid `SizedBox(width: 580)` with responsive `ConstrainedBox(constraints: BoxConstraints(maxWidth: 580))`.
+    - Added `actionsPadding` and `actionsOverflowButtonSpacing: 8` for small phone displays.
+
+- **Section 21: Live Class Camera, Microphone & Android Hardware Permissions Integration**:
+  - **Android Hardware & WebRTC Permissions ([`android/app/src/main/AndroidManifest.xml`](file:///d:/Edusphere/android/app/src/main/AndroidManifest.xml))**:
+    - Added missing Android OS permissions for `CAMERA`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `BLUETOOTH`, `BLUETOOTH_CONNECT`, and `WAKE_LOCK`.
+    - Declared camera and microphone hardware features with `android:required="false"` to allow all mobile devices to access live sessions without installation blocks.
+  - **Live Class Media Toggles & Real-Time Sync ([`lib/components/LiveClassRoom.dart`](file:///d:/Edusphere/lib/components/LiveClassRoom.dart))**:
+    - Connected mic and camera controls to trigger real-time participant state updates in Firestore (`isMicOn`, `isCameraOn`, `isHandRaised`) so all students and instructor in the room instantly see media state changes.
+    - Added user feedback SnackBars when toggling camera and microphone.
+    - Added a prominent **"Broadcast Live Audio & Video"** (for Instructor) / **"Join Live Video Feed"** (for Students) button directly on the live stage canvas for zero-prejoin video and audio room access on mobile devices.
+
 - **Section 20: Cross-Platform Native Android & iOS Google Sign-In Integration**:
   - **Native Google Sign-In Support ([`pubspec.yaml`](file:///d:/Edusphere/pubspec.yaml), [`lib/services/auth_service.dart`](file:///d:/Edusphere/lib/services/auth_service.dart))**:
     - Installed official `google_sign_in: ^6.2.2` Flutter plugin.

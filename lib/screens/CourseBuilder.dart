@@ -197,13 +197,20 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
         return AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+          contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           title: Row(
             children: [
               Icon(isEditing ? Icons.edit_note : Icons.create_new_folder_outlined, color: AppColors.secondary),
               const SizedBox(width: 10),
-              Text(
-                isEditing ? 'Edit Module Details' : 'Add Curriculum Module',
-                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  isEditing ? 'Edit Module Details' : 'Add Curriculum Module',
+                  style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -346,6 +353,10 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actionsOverflowButtonSpacing: 8,
               title: Row(
                 children: [
                   Icon(isEditing ? Icons.video_settings : Icons.video_library, color: AppColors.secondary),
@@ -360,8 +371,8 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 580,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 580),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -595,23 +606,19 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
+                            Row(
                               children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.attachment_rounded, color: AppColors.secondary, size: 20),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Attached Lesson Resources',
-                                      style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
+                                const Icon(Icons.attachment_rounded, color: AppColors.secondary, size: 18),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Attached Lesson Resources',
+                                    style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                                const SizedBox(width: 6),
                                 Text(
                                   '${draftResources.length} files',
                                   style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
@@ -646,29 +653,36 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                                       children: [
                                         Icon(
                                           isPdf ? Icons.picture_as_pdf : Icons.insert_drive_file_outlined,
-                                          size: 20,
+                                          size: 18,
                                           color: isPdf ? AppColors.error : AppColors.secondary,
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
                                                 res.title,
                                                 style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w600),
                                                 overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
                                                 res.isPreview ? 'Free Preview Access · Cloudinary Raw' : 'Enrolled Students Only · Signed Raw',
                                                 style: AppTypography.bodySmall.copyWith(fontSize: 10, color: res.isPreview ? AppColors.success : AppColors.primary),
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
                                               ),
                                             ],
                                           ),
                                         ),
+                                        const SizedBox(width: 4),
                                         IconButton(
                                           icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                          padding: const EdgeInsets.all(4),
+                                          constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                                           tooltip: 'Remove Resource',
                                           onPressed: () async {
                                             if (res.cloudinaryPublicId != null && res.cloudinaryPublicId!.isNotEmpty) {
@@ -902,6 +916,10 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actionsOverflowButtonSpacing: 8,
               title: Row(
                 children: [
                   Icon(isEditing ? Icons.edit_note : Icons.help_outline, color: AppColors.secondary),
@@ -916,8 +934,8 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 520,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1133,6 +1151,10 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actionsOverflowButtonSpacing: 8,
               title: Row(
                 children: [
                   Icon(isEditing ? Icons.quiz : Icons.add_task, color: AppColors.secondary),
@@ -1147,8 +1169,8 @@ class _CourseBuilderScreenState extends ConsumerState<CourseBuilderScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 620,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

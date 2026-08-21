@@ -375,144 +375,149 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
         final participants = participantsAsync.value ?? [];
         final messages = messagesAsync.value ?? [];
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-            vertical: AppSpacing.lg,
-          ),
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 1280),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top Breadcrumb & Notification Trigger Row
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      InkWell(
-                        onTap: () => context.go(isInstructor ? '/instructor/live-classes' : '/my-learning'),
-                        borderRadius: AppSpacing.roundedMd,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 2.0),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
-                              const SizedBox(width: 8),
-                              Text(
-                                isInstructor ? 'Back to Live Management' : 'Back to My Learning',
-                                style: AppTypography.labelMedium.copyWith(
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.w700,
+        return Scaffold(
+          body: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+              vertical: AppSpacing.lg,
+            ),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1280),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Breadcrumb & Notification Trigger Row
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        InkWell(
+                          onTap: () => context.go(isInstructor ? '/instructor/live-classes' : '/my-learning'),
+                          borderRadius: AppSpacing.roundedMd,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 2.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.arrow_back, size: 18, color: AppColors.secondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isInstructor ? 'Back to Live Management' : 'Back to My Learning',
+                                  style: AppTypography.labelMedium.copyWith(
+                                    color: AppColors.secondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.notifications_active, size: 18, color: AppColors.secondary),
-                        label: const Text('Test FCM Push Alert', style: TextStyle(color: AppColors.secondary)),
-                        onPressed: () {
-                          NotificationService().sendLiveClassNotification(
-                            classId: widget.classId,
-                            courseTitle: course?.title ?? liveClass.title,
-                            instructorName: course?.instructor.name ?? 'Dr. Sarah Chen',
-                            minutesUntilStart: 5,
-                          );
-                          AppHelpers.showSnackBar(
-                            context,
-                            '📲 [FCM] Notification dispatched: Live class starting in 5 minutes!',
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Main Video Player + Real-time Chat Row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left: Live Stream Canvas & Controls (flex 8)
-                      Expanded(
-                        flex: 8,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            LiveClassRoom(
-                              roomTitle: liveClass.title,
+                        TextButton.icon(
+                          icon: const Icon(Icons.notifications_active, size: 18, color: AppColors.secondary),
+                          label: const Text('Test FCM Push Alert', style: TextStyle(color: AppColors.secondary)),
+                          onPressed: () {
+                            NotificationService().sendLiveClassNotification(
+                              classId: widget.classId,
+                              courseTitle: course?.title ?? liveClass.title,
                               instructorName: course?.instructor.name ?? 'Dr. Sarah Chen',
-                              jitsiRoomId: liveClass.jitsiRoomId,
-                              isInstructor: isInstructor,
-                              currentUserId: user?.id ?? '',
-                              currentUserName: user?.name ?? (isInstructor ? 'Instructor' : 'Student'),
-                              participants: participants,
-                              isMicOn: _isMicOn,
-                              isCameraOn: _isCameraOn,
-                              isHandRaised: _isHandRaised,
-                              onToggleMic: _toggleMic,
-                              onToggleCamera: _toggleCamera,
-                              onToggleHandRaise: _toggleHandRaise,
-                              onToggleChat: () {
-                                setState(() => _isChatOpenMobile = !_isChatOpenMobile);
-                              },
-                              onLeaveClass: () => _showLeaveOrEndConfirmation(isInstructor),
-                            ),
-                            const SizedBox(height: 20),
+                              minutesUntilStart: 5,
+                            );
+                            AppHelpers.showSnackBar(
+                              context,
+                              '📲 [FCM] Notification dispatched: Live class starting in 5 minutes!',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
 
-                            // Mobile Chat Section (when toggled on mobile)
-                            if (!isDesktop && _isChatOpenMobile) ...[
-                              _buildChatPanel(messages),
-                              const SizedBox(height: 20),
-                            ],
-
-                            // Class Description Card
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.lg),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerLowest,
-                                borderRadius: AppSpacing.roundedXl,
-                                border: Border.all(color: AppColors.outlineVariant.withOpacity(0.3)),
+                    // Main Video Player + Real-time Chat Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left: Live Stream Canvas & Controls (flex 8)
+                        Expanded(
+                          flex: 8,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LiveClassRoom(
+                                classId: widget.classId,
+                                courseId: liveClass.courseId,
+                                roomTitle: liveClass.title,
+                                instructorName: course?.instructor.name ?? 'Dr. Sarah Chen',
+                                jitsiRoomId: liveClass.jitsiRoomId,
+                                isInstructor: isInstructor,
+                                currentUserId: user?.id ?? '',
+                                currentUserName: user?.name ?? (isInstructor ? 'Instructor' : 'Student'),
+                                participants: participants,
+                                isMicOn: _isMicOn,
+                                isCameraOn: _isCameraOn,
+                                isHandRaised: _isHandRaised,
+                                onToggleMic: _toggleMic,
+                                onToggleCamera: _toggleCamera,
+                                onToggleHandRaise: _toggleHandRaise,
+                                onToggleChat: () {
+                                  setState(() => _isChatOpenMobile = !_isChatOpenMobile);
+                                },
+                                onLeaveClass: () => _showLeaveOrEndConfirmation(isInstructor),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.secondaryFixedDim.withOpacity(0.25),
-                                          borderRadius: AppSpacing.roundedSm,
-                                        ),
-                                        child: Text(
-                                          course?.category ?? 'Live Interactive Session',
-                                          style: AppTypography.labelSmall.copyWith(
-                                            color: AppColors.secondary,
-                                            fontWeight: FontWeight.w700,
+                              const SizedBox(height: 20),
+
+                              // Mobile Chat Section (when toggled on mobile)
+                              if (!isDesktop && _isChatOpenMobile) ...[
+                                _buildChatPanel(messages),
+                                const SizedBox(height: 20),
+                              ],
+
+                              // Class Description Card
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLowest,
+                                  borderRadius: AppSpacing.roundedXl,
+                                  border: Border.all(color: AppColors.outlineVariant.withOpacity(0.3)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondaryFixedDim.withOpacity(0.25),
+                                            borderRadius: AppSpacing.roundedSm,
+                                          ),
+                                          child: Text(
+                                            course?.category ?? 'Live Interactive Session',
+                                            style: AppTypography.labelSmall.copyWith(
+                                              color: AppColors.secondary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Room: ${liveClass.jitsiRoomId}',
-                                        style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    liveClass.title,
-                                    style: AppTypography.headlineMedium.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primary,
+                                        Text(
+                                          'Room: ${liveClass.jitsiRoomId}',
+                                          style: AppTypography.labelSmall.copyWith(color: AppColors.outline),
+                                        ),
+                                      ],
                                     ),
-                                  ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      liveClass.title,
+                                      style: AppTypography.headlineMedium.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
                                   const SizedBox(height: 6),
                                   Text(
                                     liveClass.description ??
@@ -540,9 +545,10 @@ class _LiveClassScreenState extends ConsumerState<LiveClassScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 
   // =========================================================================

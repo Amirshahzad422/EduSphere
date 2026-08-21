@@ -1,6 +1,6 @@
 # ==============================================================================
 # EduSphere Project .gitignore
-# Flutter (Android/iOS/Web/Desktop) + Cloudflare Workers + Firebase + Cloudinary
+# Flutter (Android/iOS/Web/Windows/macOS/Linux) + Cloudflare Workers + Firebase
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -32,6 +32,8 @@ node_modules/
 .dev.vars.*
 dist/
 **/dist/
+worker-configuration.d.ts
+**/worker-configuration.d.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -39,7 +41,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # ------------------------------------------------------------------------------
-# 3. Environment & Secrets (NEVER COMMIT SECRETS)
+# 3. Environment & Cryptographic Secrets (NEVER COMMIT SECRETS)
 # ------------------------------------------------------------------------------
 .env
 .env.*
@@ -52,6 +54,10 @@ key.properties
 *.p12
 *.pem
 *.key
+*.pk
+Key *.pk
+test_key.*
+**/test_key.*
 serviceAccountKey*.json
 *firebase-adminsdk*.json
 
@@ -96,6 +102,9 @@ Pods/
 # 6. Windows & Linux Desktop Build Artifacts
 # ------------------------------------------------------------------------------
 **/windows/flutter/ephemeral/
+**/windows/runner/Debug/
+**/windows/runner/Release/
+**/windows/runner/Profile/
 **/linux/flutter/ephemeral/
 **/ephemeral/
 
@@ -110,6 +119,8 @@ Pods/
 *.swp
 *.swo
 *~
+.agents/
+.system_generated/
 
 # ------------------------------------------------------------------------------
 # 8. Operating System Files
@@ -124,7 +135,7 @@ Thumbs.db
 [Dd]esktop.ini
 
 # ------------------------------------------------------------------------------
-# 9. Miscellaneous
+# 9. Miscellaneous & Scratch Files
 # ------------------------------------------------------------------------------
 *.class
 *.log
@@ -136,3 +147,6 @@ Thumbs.db
 .svn/
 .swiftpm/
 migrate_working_dir/
+*.tmp
+*.bak
+lib/assets/mock/*.local.json

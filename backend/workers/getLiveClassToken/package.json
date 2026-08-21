@@ -1,0 +1,20 @@
+{
+  "name": "getliveclasstoken",
+  "version": "1.0.0",
+  "description": "EduSphere Live Class Token & JaaS Authentication Worker",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test_worker.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "firebase-auth-cloudflare-workers": "^2.0.6",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0"
+  }
+}

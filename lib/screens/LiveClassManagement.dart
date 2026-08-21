@@ -89,6 +89,118 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
     }
   }
 
+  Future<void> _handleGoLiveNowDialog(List<CourseModel> instructorCourses) async {
+    if (instructorCourses.isEmpty) {
+      AppHelpers.showSnackBar(context, 'You must create and publish a course first before going live.', isError: true);
+      return;
+    }
+
+    String selectedCourseId = _selectedCourseId ?? instructorCourses.first.id;
+    final titleCtrl = TextEditingController(
+      text: '${instructorCourses.firstWhere((c) => c.id == selectedCourseId).title} - Live Stream',
+    );
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+          contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.sensors, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Go Live Now', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Start an instant live broadcast for your enrolled students immediately with zero advance scheduling.'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedCourseId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Select Course *'),
+                  items: instructorCourses.map((c) {
+                    return DropdownMenuItem(
+                      value: c.id,
+                      child: Text(
+                        c.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() {
+                        selectedCourseId = val;
+                        final course = instructorCourses.firstWhere((c) => c.id == val);
+                        titleCtrl.text = '${course.title} - Live Stream';
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Live Session Title *'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            AppButton(
+              label: '🔴 Broadcast Now',
+              variant: ButtonVariant.danger,
+              size: ButtonSize.sm,
+              onPressed: () async {
+                final user = ref.read(authProvider);
+                if (user == null) return;
+                Navigator.pop(dialogCtx);
+
+                try {
+                  final liveClass = await ref.read(liveClassServiceProvider).goLiveNow(
+                    courseId: selectedCourseId,
+                    instructorId: user.id,
+                    title: titleCtrl.text.trim(),
+                  );
+                  if (mounted) {
+                    AppHelpers.showSnackBar(context, '🔴 Going live now on "${liveClass.title}"!');
+                    context.go('/live-class/${liveClass.id}');
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    AppHelpers.showSnackBar(context, 'Error starting live stream: $e', isError: true);
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleScheduleClass(List<CourseModel> instructorCourses) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -198,19 +310,51 @@ class _LiveClassManagementScreenState extends ConsumerState<LiveClassManagementS
               ),
               const SizedBox(height: 16),
 
-              // Header Title Area
-              Text(
-                'Live Class Management',
-                style: AppTypography.displayMedium.copyWith(
-                  fontSize: isDesktop ? 32 : 24,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Schedule and manage your upcoming interactive live sessions.',
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+              // Header Title Area with Go Live Now
+              Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Live Class Management',
+                        style: AppTypography.displayMedium.copyWith(
+                          fontSize: isDesktop ? 32 : 24,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Schedule future sessions or broadcast live instantly to your enrolled students.',
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                  coursesAsync.maybeWhen(
+                    data: (allCourses) {
+                      final instructorCourses = allCourses.where((c) {
+                        if (user == null) return false;
+                        final matchId = c.instructorId == user.id;
+                        final matchName = c.instructor.name.toLowerCase().trim() == user.name.toLowerCase().trim();
+                        return matchId || matchName;
+                      }).toList();
+
+                      return AppButton(
+                        label: '🔴 Go Live Now',
+                        variant: ButtonVariant.danger,
+                        size: ButtonSize.md,
+                        icon: Icons.sensors,
+                        onPressed: () => _handleGoLiveNowDialog(instructorCourses),
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
