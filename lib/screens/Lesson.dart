@@ -39,7 +39,7 @@ class LessonScreen extends ConsumerStatefulWidget {
   ConsumerState<LessonScreen> createState() => _LessonScreenState();
 }
 
-class _LessonScreenState extends ConsumerState<LessonScreen> with SingleTickerProviderStateMixin {
+class _LessonScreenState extends ConsumerState<LessonScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late String _currentLessonId;
   final TextEditingController _noteController = TextEditingController();
