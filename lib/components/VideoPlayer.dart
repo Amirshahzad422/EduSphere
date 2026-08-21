@@ -196,7 +196,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     _hideControlsTimer?.cancel();
     _fallbackTimer?.cancel();
     _controller?.removeListener(_onControllerUpdate);
-    _controller?.dispose();
+    try {
+      _controller?.dispose();
+    } catch (_) {}
     super.dispose();
   }
 

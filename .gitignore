@@ -43,8 +43,6 @@ lerna-debug.log*
 # ------------------------------------------------------------------------------
 # 3. Environment & Cryptographic Secrets (NEVER COMMIT SECRETS)
 # ------------------------------------------------------------------------------
-.env
-.env.*
 *.env
 *.env.*
 *.local
@@ -115,7 +113,6 @@ Pods/
 *.iml
 *.ipr
 *.iws
-.vscode/
 *.swp
 *.swo
 *~
@@ -150,3 +147,7 @@ migrate_working_dir/
 *.tmp
 *.bak
 lib/assets/mock/*.local.json
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+config.bat

@@ -79,6 +79,9 @@ Future<void> launchMobileJitsiMeeting({
   required String roomTitle,
   required bool isMicOn,
   required bool isCameraOn,
+  String? jwtToken,
+  String? jaasAppId,
+  String? serverURL,
   VoidCallback? onTerminated,
 }) async {
   // On web, embed is used directly in-canvas
